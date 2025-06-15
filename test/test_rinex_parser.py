@@ -1,16 +1,22 @@
+import os
+import sys
 import tempfile
 import unittest
 from textwrap import dedent
 
+# Add the project root directory to sys.path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 from utilities.rinex_parser import parse_rinex_nav
 from utilities.gnss_data_structures import Constellation, EphemerisData, GpsEphemeris
 from utilities.time_utils import GpsTime
+from datetime import datetime
 
 
 class TestRinexParser(unittest.TestCase):
     def _create_sample_file(self):
         data = dedent(
-            """
+            """\
             DUMMY HEADER
             END OF HEADER
             G22 2019 05 09 18 00 00-6.980421021581e-04-6.480149750132e-12 0.000000000000e+00
@@ -30,7 +36,7 @@ class TestRinexParser(unittest.TestCase):
                  8.631497621536e-06 1.712775556371e-04 9.058043360710e-06 5.440619096756e+03
                  3.474000000000e+05 2.421438694000e-08 1.231036872507e+00-6.705522537231e-08
                  9.880324324995e-01 1.562187500000e+02 1.966250675719e+00-5.353080120131e-09
-                 7.357449324439e-11 5.170000000000e+02 2.052000000000e+03                   
+                 7.357449324439e-11 5.170000000000e+02 2.052000000000e+03
                  3.120000000000e+00 0.000000000000e+00-2.095475792885e-09-2.328306436539e-09
                  3.480640000000e+05
             E01 2019 05 09 00 20 00-6.006091134623e-04-8.043343768804e-12 0.000000000000e+00
@@ -38,7 +44,7 @@ class TestRinexParser(unittest.TestCase):
                  8.473172783852e-06 1.717308769003e-04 9.112060070038e-06 5.440620021820e+03
                  3.468000000000e+05 1.303851604462e-08 1.231040013392e+00-7.078051567078e-08
                  9.880323754457e-01 1.550312500000e+02 1.966862909861e+00-5.347722754118e-09
-                 7.964617472573e-11 2.580000000000e+02 2.052000000000e+03                   
+                 7.964617472573e-11 2.580000000000e+02 2.052000000000e+03      
                 -1.000000000000e+00 0.000000000000e+00-2.095475792885e-09 0.000000000000e+00
                  3.479500000000e+05
             C01 2019 05 09 01 00 00 5.602736491710e-04 4.826539168334e-11 0.000000000000e+00
@@ -50,7 +56,8 @@ class TestRinexParser(unittest.TestCase):
                  2.000000000000e+00 0.000000000000e+00 1.420000000000e-08-1.040000000000e-08
                  3.492000000000e+05 0.000000000000e+00
             """
-        )
+        ).strip()
+        print(data)
         tmp = tempfile.NamedTemporaryFile(delete=False, mode="w+")
         tmp.write(data)
         tmp.flush()
@@ -67,6 +74,61 @@ class TestRinexParser(unittest.TestCase):
         self.assertIn(1, eph_data.gal_ephemerides)
         # Only one Galileo block should be stored (F-NAV)
         self.assertEqual(len(eph_data.gal_ephemerides[1]), 1)
+
+        # GPS Ephemeris (PRN 22)
+        epoch_time = eph_data.gps_ephemerides[22][0][0]
+        gps_eph = eph_data.gps_ephemerides[22][0][1]
+        self.assertEqual(
+            epoch_time,
+            GpsTime.fromDatetime(datetime(2019, 5, 9, 18, 0, 0), Constellation.GPS),
+        )
+        self.assertEqual(gps_eph.prn, 22)
+        self.assertEqual(gps_eph.toc.gps_week, 2052)
+        self.assertEqual(gps_eph.toc.gps_tow, 410400.0)
+        self.assertAlmostEqual(gps_eph.sv_clock_bias, -6.980421021581e-04)
+        self.assertAlmostEqual(gps_eph.sv_clock_drift, -6.480149750132e-12)
+        self.assertAlmostEqual(gps_eph.sv_clock_drift_rate, 0.0)
+        self.assertAlmostEqual(gps_eph.crs, -3.368750000000e01)
+        self.assertAlmostEqual(gps_eph.delta_n, 5.209145553250e-09)
+        self.assertAlmostEqual(gps_eph.m0, 8.788389075109e-01)
+
+        # GLONASS Ephemeris (PRN 1)
+        epoch_time = eph_data.glo_ephemerides[1][0][0]
+        glo_eph = eph_data.glo_ephemerides[1][0][1]
+        self.assertEqual(
+            epoch_time,
+            GpsTime.fromDatetime(datetime(2019, 5, 9, 21, 15, 0), Constellation.GLO),
+        )
+        self.assertEqual(glo_eph.prn, 1)
+        self.assertEqual(glo_eph.toc.gps_week, 2052)
+        self.assertAlmostEqual(glo_eph.sv_clock_bias, 4.353187978268e-05)
+        self.assertAlmostEqual(glo_eph.sv_relative_freq_bias, 0.0)
+
+        # Galileo Ephemeris (PRN 1)
+        epoch_time = eph_data.gal_ephemerides[1][0][0]
+        gal_eph = eph_data.gal_ephemerides[1][0][1]
+        self.assertEqual(
+            epoch_time,
+            GpsTime.fromDatetime(datetime(2019, 5, 9, 0, 20, 0), Constellation.GAL),
+        )
+        self.assertEqual(gal_eph.prn, 1)
+        self.assertEqual(gal_eph.toc.gps_week, 2052)
+        self.assertAlmostEqual(gal_eph.sv_clock_bias, -6.006166804582e-04)
+        self.assertAlmostEqual(gal_eph.sv_clock_drift, -8.157030606526e-12)
+        self.assertAlmostEqual(gal_eph.sv_clock_drift_rate, 0.0)
+
+        # BeiDou Ephemeris (PRN 1)
+        epoch_time = eph_data.bds_ephemerides[1][0][0]
+        bds_eph = eph_data.bds_ephemerides[1][0][1]
+        self.assertEqual(
+            epoch_time,
+            GpsTime.fromDatetime(datetime(2019, 5, 9, 1, 0, 0), Constellation.BDS),
+        )
+        self.assertEqual(bds_eph.prn, 1)
+        self.assertEqual(bds_eph.toc.gps_week, 2052)
+        self.assertAlmostEqual(bds_eph.sv_clock_bias, 5.602736491710e-04)
+        self.assertAlmostEqual(bds_eph.sv_clock_drift, 4.826539168334e-11)
+        self.assertAlmostEqual(bds_eph.sv_clock_drift_rate, 0.0)
 
     def test_get_current_ephemeris(self):
         data = EphemerisData()
