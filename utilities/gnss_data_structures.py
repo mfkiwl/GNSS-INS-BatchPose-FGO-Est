@@ -1,0 +1,201 @@
+from enum import Enum
+from numpy import nan
+
+
+class Constellation(Enum):
+    GPS = 1
+    GLO = 2
+    GAL = 3
+    BDS = 4
+
+
+class SignalType:
+    # Base class for signal types
+    def __init__(self, constellation: Constellation, obs_code: int):
+        self.constellation = constellation
+        # RINEX observation code
+        self.obs_code = obs_code
+
+    def __repr__(self):
+        return f"{self.constellation.name} Signal Code {self.obs_code}"
+
+    def __eq__(self, other):
+        return (
+            isinstance(other, SignalType)
+            and self.constellation == other.constellation
+            and self.obs_code == other.obs_code
+        )
+
+    def __hash__(self):
+        return hash((self.constellation, self.obs_code))
+
+
+class EphemerisData:
+    """
+    Class to hold ephemeris data for multiple constellations.
+
+    After loading ephemeris data, the ephemerides are organized by
+    constellation and by PRN.
+
+    Each constellation has a dictionary mapping PRN to a sorted list of tuples containing
+    GpsTime and the corresponding ephemeris object.
+
+    The class also maintains lookup dictionaries to track the current index
+    in the ephemeris time lists for each PRN.
+
+    """
+
+    def __init__(self):
+        # key: PRN, value: a list of tuples of {GpsTime, GpsEphemeris}
+        self.gps_ephemerides = {}
+        # key: PRN, value: a list of tuples of {GpsTime, GloEphemeris}
+        self.glo_ephemerides = {}
+        # key: PRN, value: a list of tuples of {GpsTime, GalEphemeris}
+        self.gal_ephemerides = {}
+        # key: PRN, value: a list of tuples of {GpsTime, BdsEphemeris}
+        self.bds_ephemerides = {}
+
+        # key: PRN, value: the current index in the ephemeris time list
+        self.gps_eph_index_lookup = {}
+        self.glo_eph_index_lookup = {}
+        self.gal_eph_index_lookup = {}
+        self.bds_eph_index_lookup = {}
+
+
+class GpsEphemeris:
+    """Class to hold GPS ephemeris parameters. See RINEX 3.03 documentation for details."""
+
+    def __init__(self):
+        self.prn = nan
+        self.toc = nan  # Time of Clock (represented in GpsTime)
+        self.sv_clock_bias = nan
+        self.sv_clock_drift = nan
+        self.sv_clock_drift_rate = nan
+        self.iode = nan
+        self.crs = nan
+        self.delta_n = nan
+        self.m0 = nan
+        self.cuc = nan
+        self.ecc = nan
+        self.cus = nan
+        self.sqrtA = nan
+        self.toe = nan  # Time of Ephemeris (represented in GpsTime)
+        self.cic = nan
+        self.omega0 = nan
+        self.cis = nan
+        self.i0 = nan
+        self.crc = nan
+        self.omega = nan
+        self.omega_dot = nan
+        self.idot = nan
+        self.code_on_L2 = nan
+        self.gps_week = nan
+        self.l2p_data_flag = nan
+        self.sv_accuracy = nan
+        self.sv_health = nan  # 0: healthy
+        self.tgd = nan
+        self.iodc = nan
+        self.transmission_time = nan  # Time of Transmission (represented in GpsTime)
+        self.fit_interval = nan
+
+
+class GloEphemeris:
+    """Class to hold GLONASS ephemeris parameters. See RINEX 3.03 documentation for details."""
+
+    def __init__(self):
+        self.prn = nan
+        self.toc = nan  # Time of Clock (represented in GpsTime)
+        self.sv_clock_bias = nan
+        self.sv_relative_freq_bias = nan
+        self.message_frame_time = nan
+        self.x_pos = nan
+        self.x_vel = nan
+        self.x_acc = nan
+        self.health = nan
+        self.y_pos = nan
+        self.y_vel = nan
+        self.y_acc = nan
+        self.freq_number = nan
+        self.z_pos = nan
+        self.z_vel = nan
+        self.z_acc = nan
+        self.age_of_oper_info = nan
+
+
+class GalEphemeris:
+    """Class to hold Galileo ephemeris parameters. See RINEX 3.03 documentation for details."""
+
+    def __init__(self):
+        self.prn = nan
+        self.toc = nan  # Time of Clock (represented in GpsTime)
+        self.sv_clock_bias = nan
+        self.sv_clock_drift = nan
+        self.sv_clock_drift_rate = nan
+        self.iod_nav = nan
+        self.crs = nan
+        self.delta_n = nan
+        self.m0 = nan
+        self.cuc = nan
+        self.ecc = nan
+        self.cus = nan
+        self.sqrtA = nan
+        self.toe = nan  # Time of Ephemeris (represented in GpsTime)
+        self.cic = nan
+        self.omega0 = nan
+        self.cis = nan
+        self.i0 = nan
+        self.crc = nan
+        self.omega = nan
+        self.omega_dot = nan
+        self.idot = nan
+        self.data_source = ""  # "F-NAV" or "I-NAV". Currently use "F-NAV" only
+        self.gal_week = nan
+        self.sisa = nan
+        self.sv_health = nan  # 0: healthy
+        self.bgd_e1e5a = nan
+        self.bgd_e1e5b = nan
+        self.iodnav = nan
+        self.transmission_time = nan  # Time of Transmission (represented in GpsTime)
+
+        # Health status flags based on sv_health value.
+        self.e1b_is_valid = False
+        self.e1b_is_health = False
+        self.e5a_is_valid = False
+        self.e5a_is_health = False
+        self.e5b_is_valid = False
+        self.e5b_is_health = False
+
+
+class BdsEphemeris:
+    """Class to hold BeiDou ephemeris parameters. See RINEX 3.03 documentation for details."""
+
+    def __init__(self):
+        self.prn = nan
+        self.toc = nan  # Time of Clock (represented in GpsTime)
+        self.sv_clock_bias = nan
+        self.sv_clock_drift = nan
+        self.sv_clock_drift_rate = nan
+        self.aode = nan
+        self.crs = nan
+        self.delta_n = nan
+        self.m0 = nan
+        self.cuc = nan
+        self.ecc = nan
+        self.cus = nan
+        self.sqrtA = nan
+        self.toe = nan  # Time of Ephemeris (represented in GpsTime)
+        self.cic = nan
+        self.omega0 = nan
+        self.cis = nan
+        self.i0 = nan
+        self.crc = nan
+        self.omega = nan
+        self.omega_dot = nan
+        self.idot = nan
+        self.bds_week = nan
+        self.sv_accuracy = nan
+        self.sv_health = nan  # 0: healthy
+        self.tgd1 = nan  # B1-B3
+        self.tgd2 = nan  # B1-B2
+        self.transmission_time = nan  # Time of Transmission (represented in GpsTime)
+        self.aodc = nan
