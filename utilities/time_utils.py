@@ -1,4 +1,5 @@
-from datetime import datetime, timedelta
+from datetime import datetime
+import pandas as pd
 import constants.gnss_constants as gnssConst
 from utilities.gnss_data_structures import Constellation
 
@@ -31,11 +32,11 @@ class GpsTime:
             return cls(week * 604800 + tow)  # 604800 seconds in a week
         elif constellation == Constellation.GAL:
             # Leap seconds between 1980 and 1999 is 13s.
-            dt = GAL_START_TIME_OFFSET_TO_GPS + timedelta(weeks=week, seconds=tow)
+            dt = GAL_START_TIME_OFFSET_TO_GPS + pd.Timedelta(weeks=week, seconds=tow)
             return cls(dt.total_seconds() + 13.0)  # Adjust for leap seconds
         elif constellation == Constellation.BDS:
             # Leap seconds between 1980 and 2060 is 14s.
-            dt = BDS_START_TIME_OFFSET_TO_GPS + timedelta(weeks=week, seconds=tow)
+            dt = BDS_START_TIME_OFFSET_TO_GPS + pd.Timedelta(weeks=week, seconds=tow)
             return cls(dt.total_seconds() + 14.0)
         elif constellation == Constellation.GLO:
             # GLONASS uses a different epoch and week system
@@ -45,42 +46,38 @@ class GpsTime:
 
     @classmethod
     def fromDatetime(
-        cls, datetime: datetime, constellation: Constellation = Constellation.GPS
+        cls, timestamp: pd.Timestamp | datetime, constellation: Constellation = Constellation.GPS
     ):
-        """Initialize from constellation system datatime."""
-        # Ensure both are offset-naive
-        datetime = datetime.replace(tzinfo=None)
+        """Initialize from a constellation system timestamp.
+
+        The ``timestamp`` argument may be either a :class:`pandas.Timestamp` or
+        a standard :class:`datetime.datetime`.  It is converted to a pandas
+        ``Timestamp`` internally to allow nanosecond precision.
+        """
+        ts = pd.Timestamp(timestamp).tz_localize(None)
 
         if constellation == Constellation.GPS:
-            dt = datetime - gnssConst.GpsConstants.START_TIME_IN_UTC
+            dt = ts - gnssConst.GpsConstants.START_TIME_IN_UTC
             return cls(dt.total_seconds())
         elif constellation == Constellation.GLO:
             # GLONASS is synced with UTC where UTS is 18 seconds behind GPS.
-            dt = (
-                datetime
-                + timedelta(seconds=18)
-                - gnssConst.GpsConstants.START_TIME_IN_UTC
-            )
+            dt = ts + pd.Timedelta(seconds=18) - gnssConst.GpsConstants.START_TIME_IN_UTC
             return cls(dt.total_seconds())
         elif constellation == Constellation.GAL:
             # Galileo epoch time since 1999-08-22 00:00:00 which is aligned with GPS epoch.
-            dt = datetime - gnssConst.GpsConstants.START_TIME_IN_UTC
+            dt = ts - gnssConst.GpsConstants.START_TIME_IN_UTC
             return cls(dt.total_seconds())
         elif constellation == Constellation.BDS:
             # BDS epoch time since 2006-01-01 00:00:00 which is aligned with UTC epoch.
-            dt = (
-                datetime
-                + timedelta(seconds=14)
-                - gnssConst.GpsConstants.START_TIME_IN_UTC
-            )
+            dt = ts + pd.Timedelta(seconds=14) - gnssConst.GpsConstants.START_TIME_IN_UTC
             return cls(dt.total_seconds())
 
     def toDatetimeInUtc(self):
-        """Return a Python datetime (UTC) for this GPS time."""
+        """Return a pandas Timestamp (UTC) for this GPS time."""
         return (
             gnssConst.GpsConstants.START_TIME_IN_UTC
-            + timedelta(seconds=self.gps_timestamp)
-            + timedelta(seconds=18)  # Leap seconds adjustment for GPS to UTC
+            + pd.Timedelta(seconds=self.gps_timestamp)
+            - pd.Timedelta(seconds=18)  # GPS time is ahead of UTC by 18 seconds
         )
 
     def __eq__(self, other):

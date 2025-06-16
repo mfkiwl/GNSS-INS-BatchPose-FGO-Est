@@ -1,5 +1,6 @@
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime
+import pandas as pd
 from utilities.time_utils import GpsTime
 from utilities.gnss_data_structures import Constellation
 
@@ -20,6 +21,15 @@ class TestGpsTime(unittest.TestCase):
         self.assertEqual(gps_epoch, gal_epoch)
         self.assertEqual(gps_epoch, bds_epoch)
         self.assertEqual(gps_epoch, glo_epoch)
+
+    def test_fractional_seconds_roundtrip(self):
+        ts = pd.Timestamp("2025-06-14 20:38:54.123456789")
+        gps_time = GpsTime.fromDatetime(ts, Constellation.GLO)
+        result = gps_time.toDatetimeInUtc()
+        # GPS time is 18 seconds ahead of UTC. ``fromDatetime`` adds this offset
+        # and ``toDatetimeInUtc`` removes it so the original timestamp is recovered.
+        self.assertAlmostEqual((result - ts).total_seconds(), 0.0, places=5)
+        self.assertAlmostEqual(result.value % 1_000_000_000, ts.value % 1_000_000_000, delta=1000)
 
 
 if __name__ == "__main__":
