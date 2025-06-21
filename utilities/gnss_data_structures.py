@@ -23,19 +23,95 @@ class SignalType:
         self.constellation = constellation
         # RINEX observation code
         self.obs_code = obs_code
+        # Unique identifier for the signal channel, See RINEX 3.03 Table 5 Channel.
+        self.channel_id = ""
 
     def __repr__(self):
-        return f"{self.constellation.name} Signal Code {self.obs_code}"
+        return f"{self.constellation.name} Signal Code {self.obs_code}{self.channel_id}"
 
     def __eq__(self, other):
         return (
             isinstance(other, SignalType)
             and self.constellation == other.constellation
             and self.obs_code == other.obs_code
+            and self.channel_id == other.channel_id
         )
 
     def __hash__(self):
-        return hash((self.constellation, self.obs_code))
+        return hash((self.constellation, self.obs_code, self.channel_id))
+
+
+class GnssMeasurementChannel:
+    """
+    Class to hold observation data
+    """
+
+    def __init__(self):
+        self.time = None  # GpsTime object
+        self.signal_type = None  # SignalType object
+        self.prn = None  # Satellite PRN number
+
+        self.code_m = None  # Code measurement value
+        self.phase_m = None  # Phase measurement value
+        self.doppler_mps = None  # Doppler frequency shift in meters per second
+        self.cn0_dbhz = None  # Signal Strength (C/N0) in dB-Hz
+
+    def addMeasurementFromObs(
+        self,
+        time: "GpsTime",
+        signal_type: SignalType,
+        prn: int,
+        code_m: float,
+        phase_m: float,
+        doppler_mps: float,
+        cn0_dbhz: float,
+    ) -> None:
+        """Add a measurement from an observation."""
+        self.time = time
+        self.signal_type = signal_type
+        self.prn = prn
+        self.code_m = code_m
+        self.phase_m = phase_m
+        self.doppler_mps = doppler_mps
+        self.cn0_dbhz = cn0_dbhz
+
+
+class GnssSignalChannel(GnssMeasurementChannel):
+    """
+    Class to hold observation data and satellite information for a single epoch.
+
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.sat_pos_ecef_m = None  # Satellite position in ECEF coordinates (x, y, z)
+        self.sat_vel_ecef_m = (
+            None  # Satellite velocity in ECEF coordinates (vx, vy, vz)
+        )
+        self.sat_clock_bias_m = None  # Satellite clock bias in meters
+        self.sat_group_delay_m = None  # Satellite group delay in meters
+        self.sat_clock_drift_mps = None  # Satellite clock drift in meters per second
+        self.elevation_deg = None  # Satellite elevation angle in degrees
+        self.azimuth_deg = None  # Satellite azimuth angle in degrees
+
+        self.correction_code_m = None  # Correction for code measurement in meters
+        self.correction_phase_m = (
+            None  # Correction phase in meters (For DGNSS/RTK, including ambiguity)
+        )
+
+        self.sigma_code_m = None  # Standard deviation of code measurement in meters
+        self.sigma_phase_m = None  # Standard deviation of phase measurement in meters
+        self.sigma_doppler_mps = (
+            None  # Standard deviation of Doppler measurement in m/s
+        )
+
+    def computeSatelliteInformation(
+        self,
+        ephemeris: Any,
+    ) -> None:
+        """Compute and store satellite information."""
+
+        # TODO: Implement satellite position and velocity computation
 
 
 class EphemerisData:
@@ -97,7 +173,7 @@ class EphemerisData:
         else:
             raise ValueError(f"Unsupported constellation {constellation}")
 
-    def add_ephemeris(
+    def addEphemeris(
         self, constellation: Constellation, prn: int, time: "GpsTime", eph: Any
     ) -> None:
         """Add an ephemeris entry for the given PRN and constellation."""
@@ -106,7 +182,7 @@ class EphemerisData:
         eph_dict.setdefault(prn, []).append((time, eph))
         idx_lookup.setdefault(prn, 0)
 
-    def get_current_ephemeris(
+    def getCurrentEphemeris(
         self, constellation: Constellation, prn: int, gps_time: "GpsTime"
     ) -> Optional[Any]:
         """Return the ephemeris covering ``gps_time`` if available."""
@@ -124,6 +200,7 @@ class EphemerisData:
         if idx >= len(eph_list):
             return None
 
+        # eph_list[idx] is tuple of (GpsTime, Ephemeris)
         diff = eph_list[idx][0] - gps_time
         if diff < 0 or diff >= max_dur:
             return None

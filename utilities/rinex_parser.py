@@ -17,7 +17,7 @@ from utilities.time_utils import GpsTime
 _FLOAT_RE = re.compile(r"[-+]?\d*\.\d+(?:[Ee][+-]?\d+)?")
 
 
-def _parse_float_fields(line: str, count: int = 4):
+def _parse_float_fields(line: str, count: int = 4) -> list[float]:
     """Extract floating point numbers from a RINEX navigation line.
 
     RINEX navigation records use fixed-width formatting without explicit
@@ -43,7 +43,8 @@ def _parse_timestamp(line: str) -> pd.Timestamp:
     return base + pd.Timedelta(seconds=second)
 
 
-def _parse_gps_block(lines):
+def _parse_gps_block(lines) -> GpsEphemeris | None:
+    """Parse a GPS ephemeris block from RINEX navigation data."""
     eph = GpsEphemeris()
     first = lines[0]
     eph.prn = int(first[1:3])
@@ -85,7 +86,8 @@ def _parse_gps_block(lines):
     return eph
 
 
-def _parse_glo_block(lines):
+def _parse_glo_block(lines) -> GloEphemeris | None:
+    """Parse a GLONASS ephemeris block from RINEX navigation data."""
     eph = GloEphemeris()
     first = lines[0]
     eph.prn = int(first[1:3])
@@ -109,7 +111,8 @@ def _parse_glo_block(lines):
     return eph
 
 
-def _parse_gal_block(lines):
+def _parse_gal_block(lines) -> GalEphemeris | None:
+    """Parse a Galileo ephemeris block from RINEX navigation data."""
     eph = GalEphemeris()
     first = lines[0]
     eph.prn = int(first[1:3])
@@ -160,7 +163,8 @@ def _parse_gal_block(lines):
     return eph
 
 
-def _parse_bds_block(lines):
+def _parse_bds_block(lines) -> BdsEphemeris | None:
+    """Parse a BeiDou ephemeris block from RINEX navigation data."""
     eph = BdsEphemeris()
     first = lines[0]
     eph.prn = int(first[1:3])
@@ -226,28 +230,28 @@ def parse_rinex_nav(file_path: str) -> EphemerisData:
                 ]
                 eph = _parse_gps_block(body)
                 if eph:
-                    eph_data.add_ephemeris(Constellation.GPS, eph.prn, eph.toc, eph)
+                    eph_data.addEphemeris(Constellation.GPS, eph.prn, eph.toc, eph)
             elif const == "R":
                 body = [line.rstrip("\n")] + [
                     f.readline().rstrip("\n") for _ in range(3)
                 ]
                 eph = _parse_glo_block(body)
                 if eph:
-                    eph_data.add_ephemeris(Constellation.GLO, eph.prn, eph.toc, eph)
+                    eph_data.addEphemeris(Constellation.GLO, eph.prn, eph.toc, eph)
             elif const == "E":
                 body = [line.rstrip("\n")] + [
                     f.readline().rstrip("\n") for _ in range(7)
                 ]
                 eph = _parse_gal_block(body)
                 if eph:
-                    eph_data.add_ephemeris(Constellation.GAL, eph.prn, eph.toc, eph)
+                    eph_data.addEphemeris(Constellation.GAL, eph.prn, eph.toc, eph)
             elif const == "C":
                 body = [line.rstrip("\n")] + [
                     f.readline().rstrip("\n") for _ in range(7)
                 ]
                 eph = _parse_bds_block(body)
                 if eph:
-                    eph_data.add_ephemeris(Constellation.BDS, eph.prn, eph.toc, eph)
+                    eph_data.addEphemeris(Constellation.BDS, eph.prn, eph.toc, eph)
             else:
                 # Unsupported constellation
                 pass

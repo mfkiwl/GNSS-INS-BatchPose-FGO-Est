@@ -9,6 +9,6 @@ if __name__ == "__main__":
 
     # Example usage: query GPS PRN 1 ephemeris at first epoch
     query_time = eph_data.gps_ephemerides[1][0][0]
-    eph = eph_data.get_current_ephemeris(Constellation.GPS, 1, query_time)
+    eph = eph_data.getCurrentEphemeris(Constellation.GPS, 1, query_time)
     print("Example ephemeris for GPS PRN 1 at", query_time, ":")
     print(eph.__dict__)

@@ -141,11 +141,11 @@ class TestRinexParser(unittest.TestCase):
         eph1 = GpsEphemeris()
         eph2 = GpsEphemeris()
         eph1.prn = eph2.prn = 1
-        data.add_ephemeris(Constellation.GPS, 1, t1, eph1)
-        data.add_ephemeris(Constellation.GPS, 1, t2, eph2)
+        data.addEphemeris(Constellation.GPS, 1, t1, eph1)
+        data.addEphemeris(Constellation.GPS, 1, t2, eph2)
 
         q = GpsTime.fromWeekAndTow(1, 1500)
-        result = data.get_current_ephemeris(Constellation.GPS, 1, q)
+        result = data.getCurrentEphemeris(Constellation.GPS, 1, q)
         self.assertIs(result, eph2)
 
 
