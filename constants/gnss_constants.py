@@ -125,6 +125,34 @@ class GloConstants:
     # Second zonal coefficient of spherical harmonic expansion
     C_20 = -108263e-9
 
+    PrnToChannelNum = {
+        1: 1,
+        2: -4,
+        3: 5,
+        4: 6,
+        5: 1,
+        6: -4,
+        7: 5,
+        8: 6,
+        9: -2,
+        10: -7,
+        11: 0,
+        12: -1,
+        13: -2,
+        14: -7,
+        15: 0,
+        16: -1,
+        17: 4,
+        18: -3,
+        19: 3,
+        20: 2,
+        21: 4,
+        22: -3,
+        23: 3,
+        24: 2,
+        25: -5,
+    }
+
     def getObsCodeToFreq(self, obs_code: int, channel_num: int) -> float:
         if channel_num < -7 or channel_num > 12:
             raise ValueError(f"Invalid GLONASS channel number: {channel_num}")
