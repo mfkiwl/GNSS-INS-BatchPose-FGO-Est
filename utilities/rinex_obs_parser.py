@@ -24,6 +24,7 @@ import constants.gnss_constants as gnssConst
 from utilities.gnss_data_structures import (
     Constellation,
     GnssMeasurementChannel,
+    SignalChannelId,
     SignalType,
 )
 from utilities.parameters import GnssParameters, RINEX_OBS_CHANNEL_TO_USE
@@ -90,7 +91,9 @@ def _get_wavelength(constellation: Constellation, prn: int, obs_code: int) -> fl
 def _parse_epoch_header(line: str) -> Tuple[GpsTime, int]:
     """Parse epoch header line beginning with ``>``."""
 
-    parts = line[1:].split()
+    # Some RINEX files use a double ``>>`` prefix.  Handle both cases
+    # by stripping all leading ``>`` characters before splitting.
+    parts = line.lstrip(">").split()
     year, month, day, hour, minute = map(int, parts[:5])
     second = float(parts[5])
     num_sats = int(parts[7])
@@ -117,11 +120,12 @@ def parse_rinex_obs(
 
     Returns
     -------
-    Dict[GpsTime, set[GnssSignalChannel]]
-        Mapping from :class:`GpsTime` to a set of observation channels.
+    Dict[GpsTime, Dict[SignalChannelId, GnssMeasurementChannel]]
+        Mapping from :class:`GpsTime` to measurement channels keyed by
+        :class:`~utilities.gnss_data_structures.SignalChannelId`.
     """
 
-    result: Dict[GpsTime, set[GnssMeasurementChannel]] = defaultdict(set)
+    result: Dict[GpsTime, Dict[SignalChannelId, GnssMeasurementChannel]] = defaultdict(dict)
 
     with open(file_path, "r") as f:
         sys_char_to_obs_type = _parse_header(f)
@@ -129,8 +133,10 @@ def parse_rinex_obs(
         first_epoch: GpsTime | None = None
         prev_epoch: GpsTime | None = None
 
+        next_line: str | None = None
         while True:
-            line = f.readline()
+            line = next_line or f.readline()
+            next_line = None
             if not line:
                 break
             if not line.startswith(">"):
@@ -154,7 +160,8 @@ def parse_rinex_obs(
                 prev_epoch = epoch_time
 
             for _ in range(num_sats):
-                sat_line = f.readline()
+                sat_line = next_line or f.readline()
+                next_line = None
                 if not sat_line:
                     break
                 sys_char = sat_line[0]
@@ -169,9 +176,12 @@ def parse_rinex_obs(
                 data_str = sat_line[3:].rstrip("\n")
                 while len(data_str) < needed_len:
                     cont = f.readline()
-                    data_str += cont.rstrip("\n")
+                    if not cont or not cont.startswith(" "):
+                        next_line = cont
+                        break
+                    data_str += cont[3:].rstrip("\n")
 
-                values = [data_str[i : i + 16] for i in range(0, needed_len, 16)]
+                values = [data_str[i : i + 16] for i in range(0, len(data_str), 16)]
                 parsed_vals = [v[:14].strip() for v in values]
 
                 meas_map: Dict[Tuple[int, str], Dict[str, float]] = {}
@@ -207,14 +217,22 @@ def parse_rinex_obs(
                     phase_m = phase_cycles * wavelength
                     doppler_mps = -doppler_hz * wavelength
 
-                    signal = SignalType(_SYS_CHAR_TO_CONSTEL_MAP[sys_char], obs_code)
-                    signal.channel_id = chan_id
+                    signal = SignalType(
+                        _SYS_CHAR_TO_CONSTEL_MAP[sys_char], obs_code, chan_id
+                    )
+                    signal_id = SignalChannelId(prn, signal)
 
                     channel = GnssMeasurementChannel()
                     channel.addMeasurementFromObs(
-                        epoch_time, signal, prn, code, phase_m, doppler_mps, cn0
+                        epoch_time,
+                        signal_id,
+                        f"{sys_char}{prn:02d}",
+                        code,
+                        phase_m,
+                        doppler_mps,
+                        cn0,
                     )
 
-                    result[epoch_time].add(channel)
+                    result[epoch_time][signal_id] = channel
 
     return result

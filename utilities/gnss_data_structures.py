@@ -17,51 +17,30 @@ class Constellation(Enum):
     BDS = 4
 
 
-class SignalType:
-    # Base class for signal types
-    def __init__(self, constellation: Constellation, obs_code: int):
-        self.constellation = constellation
-        # RINEX observation code
-        self.obs_code = obs_code
-        # Unique identifier for the signal channel, See RINEX 3.03 Table 5 Channel.
-        self.channel_id = ""
+from dataclasses import dataclass
 
-    def __repr__(self):
+
+@dataclass(frozen=True)
+class SignalType:
+    """Represents a GNSS signal type."""
+
+    constellation: Constellation
+    obs_code: int
+    channel_id: str = ""
+
+    def __repr__(self) -> str:
         return f"{self.constellation.name} Signal Code {self.obs_code}{self.channel_id}"
 
-    def __eq__(self, other):
-        return (
-            isinstance(other, SignalType)
-            and self.constellation == other.constellation
-            and self.obs_code == other.obs_code
-            and self.channel_id == other.channel_id
-        )
 
-    def __hash__(self):
-        return hash((self.constellation, self.obs_code, self.channel_id))
-
-
+@dataclass(frozen=True)
 class SignalChannelId:
-    """
-    Class to represent a signal channel with a unique PRN and channel ID.
-    """
+    """Identifies a measurement channel by PRN and signal type."""
 
-    def __init__(self, prn: int, signal_type: SignalType):
-        self.prn = prn
-        self.signal_type = signal_type
+    prn: int
+    signal_type: SignalType
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"{self.signal_type} PRN {self.prn}"
-
-    def __eq__(self, other):
-        return (
-            isinstance(other, SignalChannelId)
-            and self.prn == other.prn
-            and self.signal_type == other.signal_type
-        )
-
-    def __hash__(self):
-        return hash((self.prn, self.signal_type))
 
 
 class GnssSignalChannel:
@@ -87,6 +66,7 @@ class GnssSignalChannel:
         self.sat_group_delay_m = None  # Satellite group delay in meters
         self.sat_clock_drift_mps = None  # Satellite clock drift in meters per second
 
+
     def addMeasurementFromObs(
         self,
         time: "GpsTime",
@@ -110,12 +90,11 @@ class GnssSignalChannel:
         return (
             isinstance(other, GnssSignalChannel)
             and self.time == other.time
-            and self.signal_type == other.signal_type
-            and self.prn == other.prn
+            and self.signal_id == other.signal_id
         )
 
     def __hash__(self):
-        return hash((self.time, self.signal_type, self.prn))
+        return hash((self.time, self.signal_id))
 
     def computeSatelliteInformation(
         self,
@@ -150,7 +129,7 @@ class GnssMeasurementChannel(GnssSignalChannel):
         )
 
     def __hash__(self):
-        return hash((self.time, self.signal_type, self.prn))
+        return hash((self.time, self.signal_id))
 
 
 class EphemerisData:
