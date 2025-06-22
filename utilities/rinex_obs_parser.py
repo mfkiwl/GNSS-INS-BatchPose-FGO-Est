@@ -71,20 +71,20 @@ def _parse_header(f) -> Dict[Constellation, List[str]]:
     return sys_char_to_obs_type
 
 
-def _get_wavelength(constellation: Constellation, prn: int, obs_code: int) -> float:
+def _get_wavelength_m(constellation: Constellation, prn: int, obs_code: int) -> float:
     """Return wavelength in metres for the given observation code."""
 
     if constellation == Constellation.GPS:
-        return gnssConst.GpsConstants.ObsCodeToWavelength[obs_code]
+        return gnssConst.GpsConstants.ObsCodeToWavelengthM[obs_code]
     if constellation == Constellation.GAL:
-        return gnssConst.GalConstants.ObsCodeToWavelength[obs_code]
+        return gnssConst.GalConstants.ObsCodeToWavelengthM[obs_code]
     if constellation == Constellation.BDS:
-        return gnssConst.BdsConstants.ObsCodeToWavelength[obs_code]
+        return gnssConst.BdsConstants.ObsCodeToWavelengthM[obs_code]
     if constellation == Constellation.GLO:
         ch = gnssConst.GloConstants.PrnToChannelNum.get(prn)
         if ch is None:
             raise ValueError(f"Unknown GLONASS channel number for PRN {prn}")
-        return gnssConst.GloConstants().getObsCodeToWavelength(obs_code, ch)
+        return gnssConst.GloConstants().getObsCodeToWavelengthM(obs_code, ch)
     raise ValueError(f"Unsupported constellation {constellation}")
 
 
@@ -125,7 +125,9 @@ def parse_rinex_obs(
         :class:`~utilities.gnss_data_structures.SignalChannelId`.
     """
 
-    result: Dict[GpsTime, Dict[SignalChannelId, GnssMeasurementChannel]] = defaultdict(dict)
+    result: Dict[GpsTime, Dict[SignalChannelId, GnssMeasurementChannel]] = defaultdict(
+        dict
+    )
 
     with open(file_path, "r") as f:
         sys_char_to_obs_type = _parse_header(f)
@@ -172,11 +174,18 @@ def parse_rinex_obs(
                     continue
                 prn_id = sat_line[:3]
                 obs_list = sys_char_to_obs_type[sys_char]
+
+                # Calculate the total number of characters needed to represent all observation types
+                # Each observation type is represented by a 16-character field in the RINEX file
                 needed_len = len(obs_list) * 16
+
+                # Extract the observation data from the current line, skipping the first 3 characters
+                # (which represent the satellite identifier) and removing any trailing newline characters
                 data_str = sat_line[3:].rstrip("\n")
                 while len(data_str) < needed_len:
                     cont = f.readline()
                     if not cont or not cont.startswith(" "):
+                        # Check if it's a continuation line
                         next_line = cont
                         break
                     data_str += cont[3:].rstrip("\n")
@@ -184,6 +193,13 @@ def parse_rinex_obs(
                 values = [data_str[i : i + 16] for i in range(0, len(data_str), 16)]
                 parsed_vals = [v[:14].strip() for v in values]
 
+                # Initialize a dictionary to store parsed measurement data for each observation type.
+                # The key is a tuple `(obs_code, chan_id)`:
+                #   - `obs_code` is the observation code.
+                #   - `chan_id` is the signal channel identifier (e.g., 'C', 'W').
+                # The value is another dictionary where:
+                #   - The key is the measurement type ('C' for code, 'L' for phase, 'D' for Doppler, 'S' for signal strength).
+                #   - The value is the parsed measurement value (float) or `None` if the value is missing.
                 meas_map: Dict[Tuple[int, str], Dict[str, float]] = {}
                 for t, val_str in zip(obs_list, parsed_vals):
                     if not val_str:
@@ -210,12 +226,15 @@ def parse_rinex_obs(
                     doppler_hz = meas["D"]
                     if code is None or phase_cycles is None or doppler_hz is None:
                         continue
+                    if code < 100.0 or phase_cycles < 100.0:
+                        # Code and phase must be valid measurements
+                        continue
 
-                    wavelength = _get_wavelength(
+                    wavelength_m = _get_wavelength_m(
                         _SYS_CHAR_TO_CONSTEL_MAP[sys_char], prn, obs_code
                     )
-                    phase_m = phase_cycles * wavelength
-                    doppler_mps = -doppler_hz * wavelength
+                    phase_m = phase_cycles * wavelength_m
+                    doppler_mps = -doppler_hz * wavelength_m
 
                     signal = SignalType(
                         _SYS_CHAR_TO_CONSTEL_MAP[sys_char], obs_code, chan_id
@@ -223,6 +242,7 @@ def parse_rinex_obs(
                     signal_id = SignalChannelId(prn, signal)
 
                     channel = GnssMeasurementChannel()
+                    channel.wavelength_m = wavelength_m
                     channel.addMeasurementFromObs(
                         epoch_time,
                         signal_id,

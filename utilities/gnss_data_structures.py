@@ -66,7 +66,6 @@ class GnssSignalChannel:
         self.sat_group_delay_m = None  # Satellite group delay in meters
         self.sat_clock_drift_mps = None  # Satellite clock drift in meters per second
 
-
     def addMeasurementFromObs(
         self,
         time: "GpsTime",
@@ -114,6 +113,7 @@ class GnssMeasurementChannel(GnssSignalChannel):
     def __init__(self):
         super().__init__()
 
+        self.wavelength_m = None  # Wavelength in meters
         self.elevation_deg = None  # Satellite elevation angle in degrees
         self.azimuth_deg = None  # Satellite azimuth angle in degrees
 
