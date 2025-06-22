@@ -41,6 +41,29 @@ class SignalType:
         return hash((self.constellation, self.obs_code, self.channel_id))
 
 
+class SignalChannelId:
+    """
+    Class to represent a signal channel with a unique PRN and channel ID.
+    """
+
+    def __init__(self, prn: int, signal_type: SignalType):
+        self.prn = prn
+        self.signal_type = signal_type
+
+    def __repr__(self):
+        return f"{self.signal_type} PRN {self.prn}"
+
+    def __eq__(self, other):
+        return (
+            isinstance(other, SignalChannelId)
+            and self.prn == other.prn
+            and self.signal_type == other.signal_type
+        )
+
+    def __hash__(self):
+        return hash((self.prn, self.signal_type))
+
+
 class GnssSignalChannel:
     """
     Class to hold observation data
@@ -48,8 +71,8 @@ class GnssSignalChannel:
 
     def __init__(self):
         self.time = None  # GpsTime object
-        self.signal_type = None  # SignalType object
-        self.prn = None  # Satellite PRN number
+        self.signal_id: SignalChannelId = None  # SignalChannelId object
+        self.svid: str = None  # Satellite SVID (Constellation+PRN)
 
         self.code_m = None  # Code measurement value
         self.phase_m = None  # Phase measurement value
@@ -67,8 +90,8 @@ class GnssSignalChannel:
     def addMeasurementFromObs(
         self,
         time: "GpsTime",
-        signal_type: SignalType,
-        prn: int,
+        signal_id: SignalChannelId,
+        svid: str,
         code_m: float,
         phase_m: float,
         doppler_mps: float,
@@ -76,8 +99,8 @@ class GnssSignalChannel:
     ) -> None:
         """Add a measurement from an observation."""
         self.time = time
-        self.signal_type = signal_type
-        self.prn = prn
+        self.signal_id = signal_id
+        self.svid = svid
         self.code_m = code_m
         self.phase_m = phase_m
         self.doppler_mps = doppler_mps
