@@ -7,6 +7,7 @@ import unittest
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from utilities.rinex_obs_parser import parse_rinex_obs
+from utilities.gnss_data_structures import SignalType, SignalChannelId, Constellation
 
 
 class TestRinexObsParser(unittest.TestCase):
@@ -49,18 +50,56 @@ class TestRinexObsParser(unittest.TestCase):
         channels = result[epoch]
         self.assertEqual(len(channels), 8 + 4 + 0)
 
-        G18_1C_CHANNEL = next(
-            c
-            for c in channels
-            if c.prn == 18
-            and c.signal_type.obs_code == 1
-            and c.signal_type.channel_id == "C"
+        from utilities.gnss_data_structures import (
+            SignalChannelId,
+            SignalType,
+            Constellation,
         )
-        self.assertEqual(G18_1C_CHANNEL.prn, 18)
-        self.assertEqual(G18_1C_CHANNEL.signal_type.obs_code, 1)
-        self.assertEqual(G18_1C_CHANNEL.signal_type.channel_id, "C")
+
+        ch_id = SignalChannelId(18, SignalType(Constellation.GPS, 1, "C"))
+        G18_1C_CHANNEL = channels[ch_id]
+        self.assertEqual(G18_1C_CHANNEL.signal_id.prn, 18)
+        self.assertEqual(G18_1C_CHANNEL.signal_id.signal_type.obs_code, 1)
+        self.assertEqual(G18_1C_CHANNEL.signal_id.signal_type.channel_id, "C")
         self.assertAlmostEqual(G18_1C_CHANNEL.code_m, 22200304.783)
         self.assertAlmostEqual(G18_1C_CHANNEL.cn0_dbhz, 43.563)
+
+    def test_edge_cases(self):
+        tmp = self._create_sample()
+        try:
+            result = parse_rinex_obs(tmp.name)
+        finally:
+            tmp.close()
+            os.unlink(tmp.name)
+
+        epoch = next(iter(result))
+        channels = result[epoch]
+
+        # PRN 3 has missing phase for 5Q so it should not appear
+        sig = SignalType(Constellation.GAL, 5, "Q")
+        gal5q_missing = SignalChannelId(3, sig)
+        self.assertNotIn(gal5q_missing, channels)
+
+        # PRN 9 has complete 5Q measurements
+        gal5q = SignalChannelId(9, sig)
+        self.assertIn(gal5q, channels)
+
+        sig = SignalType(Constellation.GLO, 2, "C")
+        glo_2c = SignalChannelId(23, sig)
+        self.assertIn(glo_2c, channels)
+        self.assertAlmostEqual(channels[glo_2c].code_m, 19397871.832)
+
+        r17_1c = SignalChannelId(17, SignalType(Constellation.GLO, 1, "C"))
+        self.assertIn(r17_1c, channels)
+        r17_2c = SignalChannelId(17, SignalType(Constellation.GLO, 2, "C"))
+        self.assertNotIn(r17_2c, channels)
+
+        g17_2l = SignalChannelId(17, SignalType(Constellation.GPS, 2, "L"))
+        self.assertIn(g17_2l, channels)
+        self.assertAlmostEqual(channels[g17_2l].code_m, 22119480.056)
+
+        g18_2l = SignalChannelId(18, SignalType(Constellation.GPS, 2, "L"))
+        self.assertNotIn(g18_2l, channels)
 
 
 if __name__ == "__main__":
