@@ -158,7 +158,7 @@ def _parse_gal_block(lines) -> GalEphemeris | None:
     eph.e5b_is_health = ((eph.sv_health >> 7) & 0x3) == 0
 
     # Use I/NAV only
-    if eph.data_source != 517 or eph.sv_health != 0:
+    if eph.data_source != 258 or eph.sv_health != 0:
         return None
 
     return eph
@@ -257,4 +257,5 @@ def parse_rinex_nav(file_path: str) -> EphemerisData:
                 # Unsupported constellation
                 pass
 
+    eph_data.resetIndexLookup()
     return eph_data

@@ -233,13 +233,13 @@ def parse_rinex_obs(
                         continue
 
                     wavelength_m = _get_wavelength_m(
-                        _SYS_CHAR_TO_CONSTEL_MAP[sys_char], prn, obs_code
+                        _SYS_CHAR_TO_CONSTEL_MAP[sys_char][0], prn, obs_code
                     )
                     phase_m = phase_cycles * wavelength_m
                     doppler_mps = -doppler_hz * wavelength_m
 
                     signal = SignalType(
-                        _SYS_CHAR_TO_CONSTEL_MAP[sys_char], obs_code, chan_id
+                        _SYS_CHAR_TO_CONSTEL_MAP[sys_char][0], obs_code, chan_id
                     )
                     signal_id = SignalChannelId(prn, signal)
 

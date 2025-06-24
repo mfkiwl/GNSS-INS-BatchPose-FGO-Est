@@ -99,8 +99,31 @@ class GnssSignalChannel:
         ephemeris: Any,
     ) -> None:
         """Compute and store satellite information."""
+        from utilities import satellite_utils
 
-        # TODO: Implement satellite position and velocity computation
+        const = self.signal_id.signal_type.constellation
+        try:
+            (
+                self.sat_pos_ecef_m,
+                self.sat_vel_ecef_m,
+                self.sat_clock_bias_m,
+                self.sat_group_delay_m,
+                self.sat_clock_drift_mps,
+            ) = satellite_utils.compute_satellite_info(self.time, const, ephemeris)
+        except Exception:
+            self.sat_pos_ecef_m = None
+            self.sat_vel_ecef_m = None
+            self.sat_clock_bias_m = None
+            self.sat_group_delay_m = None
+            self.sat_clock_drift_mps = None
+            return
+
+        if self.code_m is not None:
+            self.code_m -= self.sat_clock_bias_m + self.sat_group_delay_m
+        if self.phase_m is not None:
+            self.phase_m -= self.sat_clock_bias_m
+        if self.doppler_mps is not None:
+            self.doppler_mps -= self.sat_clock_drift_mps
 
 
 class GnssMeasurementChannel(GnssSignalChannel):
@@ -190,8 +213,8 @@ class EphemerisData:
         else:
             raise ValueError(f"Unsupported constellation {constellation}")
 
-    def _resetIndexLookup(self) -> None:
-        """Reset the index lookup for the given constellation."""
+    def resetIndexLookup(self) -> None:
+        """Reset the ephemeris index lookup tables."""
         for key in self.gps_eph_index_lookup:
             self.gps_eph_index_lookup[key] = 0
         for key in self.glo_eph_index_lookup:
