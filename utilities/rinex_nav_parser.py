@@ -3,7 +3,7 @@
 import re
 import pandas as pd
 
-from utilities.gnss_data_structures import (
+from utilities.gnss_data_utils import (
     Constellation,
     EphemerisData,
     GpsEphemeris,
@@ -49,6 +49,7 @@ def _parse_gps_block(lines) -> GpsEphemeris | None:
     first = lines[0]
     eph.prn = int(first[1:3])
 
+    eph.toc_str = first[4:23].strip()
     ts = _parse_timestamp(first)
     eph.toc = GpsTime.fromDatetime(ts, Constellation.GPS)
     eph.sv_clock_bias = float(first[23:42])
@@ -74,6 +75,7 @@ def _parse_gps_block(lines) -> GpsEphemeris | None:
     trans_time, eph.fit_interval, _, _ = _parse_float_fields(lines[7])
 
     eph.gps_week = int(gps_week)
+    eph.toe_sec = toe
     eph.toe = GpsTime.fromWeekAndTow(eph.gps_week, toe, Constellation.GPS)
     eph.transmission_time = GpsTime.fromWeekAndTow(
         eph.gps_week, trans_time, Constellation.GPS
@@ -92,6 +94,7 @@ def _parse_glo_block(lines) -> GloEphemeris | None:
     first = lines[0]
     eph.prn = int(first[1:3])
 
+    eph.toc_str = first[4:23].strip()
     ts = _parse_timestamp(first)
     eph.toc = GpsTime.fromDatetime(ts, Constellation.GLO)
     eph.sv_clock_bias = float(first[23:42])
@@ -99,11 +102,12 @@ def _parse_glo_block(lines) -> GloEphemeris | None:
     eph.message_frame_time = float(first[61:80])
 
     eph.x_pos, eph.x_vel, eph.x_acc, health = _parse_float_fields(lines[1])
-    eph.y_pos, eph.y_vel, eph.y_acc, eph.freq_number = _parse_float_fields(lines[2])
+    eph.y_pos, eph.y_vel, eph.y_acc, freq_number = _parse_float_fields(lines[2])
     eph.z_pos, eph.z_vel, eph.z_acc, eph.age_of_oper_info = _parse_float_fields(
         lines[3]
     )
 
+    eph.freq_number = int(freq_number)
     eph.health = int(health)
     if eph.health != 0:
         return None
@@ -117,6 +121,7 @@ def _parse_gal_block(lines) -> GalEphemeris | None:
     first = lines[0]
     eph.prn = int(first[1:3])
 
+    eph.toc_str = first[4:23].strip()
     ts = _parse_timestamp(first)
     eph.toc = GpsTime.fromDatetime(ts, Constellation.GAL)
     eph.sv_clock_bias = float(first[23:42])
@@ -142,7 +147,10 @@ def _parse_gal_block(lines) -> GalEphemeris | None:
     trans_time, _, _, _ = _parse_float_fields(lines[7])
 
     eph.data_source = int(data_source)
-    eph.gal_week = int(gal_week)
+    # GAL week = Galileo System Time (GST) week + 1024 + n*4096 (n: number of GST roll-overs).
+    # it is aligned to the GPS week.
+    eph.gal_week = int(gal_week) - 1024
+    eph.toe_sec = toe
     eph.toe = GpsTime.fromWeekAndTow(eph.gal_week, toe, Constellation.GAL)
     eph.transmission_time = GpsTime.fromWeekAndTow(
         eph.gal_week, trans_time, Constellation.GAL
@@ -158,7 +166,7 @@ def _parse_gal_block(lines) -> GalEphemeris | None:
     eph.e5b_is_health = ((eph.sv_health >> 7) & 0x3) == 0
 
     # Use I/NAV only
-    if eph.data_source != 258 or eph.sv_health != 0:
+    if eph.data_source != 517 or eph.sv_health != 0:
         return None
 
     return eph
@@ -170,6 +178,7 @@ def _parse_bds_block(lines) -> BdsEphemeris | None:
     first = lines[0]
     eph.prn = int(first[1:3])
 
+    eph.toc_str = first[4:23].strip()
     ts = _parse_timestamp(first)
     eph.toc = GpsTime.fromDatetime(ts, Constellation.BDS)
     eph.sv_clock_bias = float(first[23:42])
@@ -196,6 +205,8 @@ def _parse_bds_block(lines) -> BdsEphemeris | None:
 
     eph.bds_week = int(bds_week)
     eph.sv_health = int(sv_health)
+    #  BDT week = BDT week_BRD  + (n*8192) where (n: number of BDT roll-overs).
+    eph.toe_sec = toe
     eph.toe = GpsTime.fromWeekAndTow(eph.bds_week, toe, Constellation.BDS)
     eph.transmission_time = GpsTime.fromWeekAndTow(
         eph.bds_week, trans_time, Constellation.BDS
@@ -257,5 +268,4 @@ def parse_rinex_nav(file_path: str) -> EphemerisData:
                 # Unsupported constellation
                 pass
 
-    eph_data.resetIndexLookup()
     return eph_data

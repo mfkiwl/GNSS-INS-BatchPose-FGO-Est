@@ -5,9 +5,8 @@ import unittest
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 import numpy as np
-import constants.gnss_constants as gnssConst
 
-from utilities.gnss_data_structures import (
+from utilities.gnss_data_utils import (
     Constellation,
     EphemerisData,
     GpsEphemeris,
@@ -16,7 +15,7 @@ from utilities.gnss_data_structures import (
     SignalType,
 )
 from utilities.time_utils import GpsTime
-from utilities import satellite_utils
+from utilities.gnss_data_utils import apply_ephemerides_to_obs
 
 
 class TestSatelliteUtils(unittest.TestCase):
@@ -27,7 +26,7 @@ class TestSatelliteUtils(unittest.TestCase):
         ch.addMeasurementFromObs(epoch, ch_id, "G01", 100.0, 50.0, 0.0, 45.0)
         obs = {epoch: {ch_id: ch}}
         eph = EphemerisData()
-        satellite_utils.apply_ephemerides_to_obs(obs, eph)
+        apply_ephemerides_to_obs(obs, eph)
         self.assertFalse(obs)
 
     def test_basic_clock_correction(self):

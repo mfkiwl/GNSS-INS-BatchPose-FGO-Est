@@ -9,7 +9,7 @@ from textwrap import dedent
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from utilities.rinex_nav_parser import parse_rinex_nav
-from utilities.gnss_data_structures import Constellation, EphemerisData, GpsEphemeris
+from utilities.gnss_data_utils import Constellation, EphemerisData, GpsEphemeris
 from utilities.time_utils import GpsTime
 from datetime import datetime
 
@@ -40,14 +40,6 @@ class TestRinexParser(unittest.TestCase):
                  7.357449324439e-11 5.170000000000e+02 2.052000000000e+03
                  3.120000000000e+00 0.000000000000e+00-2.095475792885e-09-2.328306436539e-09
                  3.480640000000e+05
-            E01 2019 05 09 00 20 00-6.006091134623e-04-8.043343768804e-12 0.000000000000e+00
-                 6.600000000000e+01 1.843125000000e+02 2.430101223470e-09-4.027602495868e-01
-                 8.473172783852e-06 1.717308769003e-04 9.112060070038e-06 5.440620021820e+03
-                 3.468000000000e+05 1.303851604462e-08 1.231040013392e+00-7.078051567078e-08
-                 9.880323754457e-01 1.550312500000e+02 1.966862909861e+00-5.347722754118e-09
-                 7.964617472573e-11 2.580000000000e+02 2.052000000000e+03      
-                -1.000000000000e+00 0.000000000000e+00-2.095475792885e-09 0.000000000000e+00
-                 3.479500000000e+05
             C01 2019 05 09 01 00 00 5.602736491710e-04 4.826539168334e-11 0.000000000000e+00
                  1.000000000000e+00-6.211875000000e+02-3.925877814283e-09-2.167503995504e+00
                 -2.036709338427e-05 2.164692850783e-04 2.449378371239e-07 6.493401098251e+03
@@ -113,7 +105,7 @@ class TestRinexParser(unittest.TestCase):
         gal_eph = eph_data.gal_ephemerides[1][0][1]
         self.assertEqual(
             epoch_time,
-            GpsTime.fromDatetime(pd.Timestamp(2019, 5, 9, 0, 20, 0), Constellation.GAL),
+            GpsTime.fromDatetime(pd.Timestamp(2019, 5, 9, 0, 30, 0), Constellation.GAL),
         )
         self.assertEqual(gal_eph.prn, 1)
         self.assertEqual(gal_eph.toc.gps_week, 2052)

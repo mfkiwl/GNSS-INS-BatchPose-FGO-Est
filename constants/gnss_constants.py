@@ -5,6 +5,13 @@ import pandas as pd
 SPEED_OF_LIGHT_MS = 299792458.0  # Speed of light in meters per second
 
 
+class Constellation(Enum):
+    GPS = 1
+    GLO = 2
+    GAL = 3
+    BDS = 4
+
+
 class EarthConstants:
     # Earth radius in meters
     RADIUS_M = 6378137.0
@@ -58,6 +65,8 @@ class GpsConstants:
 
     # Wavelength of L5 frequency in meters
     L5_WAVELENGTH_M = SPEED_OF_LIGHT_MS / L5_FREQ_HZ
+
+    L1_FREQ_SQUARE_D_L2_FREQ_SQUARE = L1_FREQ_HZ**2 / L2_FREQ_HZ**2
 
     # Mapping of observation code number to frequency
     ObsCodeToFreq = {1: L1_FREQ_HZ, 2: L2_FREQ_HZ, 5: L5_FREQ_HZ}
@@ -230,7 +239,7 @@ class GalConstants:
     START_TIME_IN_UTC = pd.Timestamp("1999-08-21T23:59:47")
 
     # Maximum duration to use ephemeris in seconds
-    MAX_DURATION_TO_EPH = 3600.0
+    MAX_DURATION_TO_EPH = 7200.0
 
     # Geocentric gravitational constant in m^3/s^2
     MU = 3.986004418e14
@@ -246,25 +255,25 @@ class BdsConstants:
     # Maximum PRN number for Beidou (Index 0 is not used)
     MAX_PRN = 65 + 1
 
-    # RINEX 3.04 Obs Code Number: 2
+    # RINEX 3.04 Obs Code Number: 2. # BDS ICD B1I
     B12_FREQ_HZ = 1561.098e6
 
     # Wavelength of B1-2 frequency in meters
     B12_WAVELENGTH_M = SPEED_OF_LIGHT_MS / B12_FREQ_HZ
 
-    # RINEX 3.04 Obs Code Number: 1
+    # RINEX 3.04 Obs Code Number: 1. # BDS ICD B1C
     B1_FREQ_HZ = 1575.42e6
 
     # Wavelength of B1 frequency in meters
     B1_WAVELENGTH_M = SPEED_OF_LIGHT_MS / B1_FREQ_HZ
 
-    # RINEX 3.04 Obs Code Number: 5
+    # RINEX 3.04 Obs Code Number: 5. # BDS ICD B2a
     B2A_FREQ_HZ = 1176.45e6
 
     # Wavelength of B2a frequency in meters
     B2A_WAVELENGTH_M = SPEED_OF_LIGHT_MS / B2A_FREQ_HZ
 
-    # RINEX 3.04 Obs Code Number: 7
+    # RINEX 3.04 Obs Code Number: 7. # BDS ICD B2b, original B2I
     B2B_FREQ_HZ = 1207.14e6
 
     # Wavelength of B2b frequency in meters
@@ -276,7 +285,9 @@ class BdsConstants:
     # Wavelength of B2 frequency in meters
     B2_WAVELENGTH_M = SPEED_OF_LIGHT_MS / B2_FREQ_HZ
 
-    # RINEX 3.04 Obs Code Number: 6
+    # RINEX 3.04 Obs Code Number: 6. # BDS ICD B3I
+    # The B3I equipment group delay is included in the clock correction parameter a0,
+    # there is no need to make a further correction for the single-frequency B3I user.
     B3_FREQ_HZ = 1268.52e6
 
     # Wavelength of B3 frequency in meters
@@ -303,4 +314,13 @@ class BdsConstants:
     START_TIME_IN_UTC = pd.Timestamp("2006-01-01T00:00:00")
 
     # Maximum duration to use ephemeris in seconds
-    MAX_DURATION_TO_EPH = 3600.0
+    MAX_DURATION_TO_EPH = 7200.0
+
+    # Geocentric gravitational constant in m^3/s^2
+    MU = 3.986004418e14
+
+    # Earth rotation rate in rad/s
+    OMEGA_DOT_E = 7.2921150e-5
+
+    # Relativistic correction term in s/s
+    F = -2 * np.sqrt(MU) / (np.square(SPEED_OF_LIGHT_MS))

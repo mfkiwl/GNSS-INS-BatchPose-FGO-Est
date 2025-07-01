@@ -1,6 +1,6 @@
 import pandas as pd
 import constants.gnss_constants as gnssConst
-from utilities.gnss_data_structures import Constellation
+from utilities.gnss_data_utils import Constellation
 
 
 GAL_START_TIME_OFFSET_TO_GPS = (
@@ -84,6 +84,12 @@ class GpsTime:
             + pd.Timedelta(seconds=self.gps_timestamp)
             - pd.Timedelta(seconds=18)  # GPS time is ahead of UTC by 18 seconds
         )
+
+    def minus_float_seconds(self, seconds: float):
+        """Return a new GpsTime with seconds subtracted."""
+        if not isinstance(seconds, float):
+            raise TypeError("seconds must be a float value")
+        return GpsTime(self.gps_timestamp - seconds)
 
     def __eq__(self, other):
         # Allow for floating point precision
