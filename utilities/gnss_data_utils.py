@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, Optional, TYPE_CHECKING
+from typing import Dict, Any, Optional, TYPE_CHECKING
 
 from numpy import nan
 import constants.gnss_constants as gnssConst
+from constants.gnss_constants import Constellation
 
 if TYPE_CHECKING:
     from utilities.time_utils import GpsTime
@@ -12,11 +13,32 @@ if TYPE_CHECKING:
 from dataclasses import dataclass
 
 
-class Constellation(Enum):
-    GPS = 1
-    GLO = 2
-    GAL = 3
-    BDS = 4
+def apply_ephemerides_to_obs(
+    obs: Dict[GpsTime, Dict[SignalChannelId, GnssMeasurementChannel]],
+    eph_data: EphemerisData,
+) -> None:
+    """Populate satellite information for all observation channels.
+
+    Channels without valid ephemeris are removed from ``obs``.
+    """
+
+    for epoch in list(obs.keys()):
+        channels = obs[epoch]
+        to_delete = []
+        for ch_id, ch in channels.items():
+            eph = eph_data.getCurrentEphemeris(
+                ch_id.signal_type.constellation, ch_id.prn, epoch
+            )
+            if eph is None:
+                to_delete.append(ch_id)
+                continue
+            ch.computeSatelliteInformation(eph)
+            if ch.sat_pos_ecef_m is None:
+                to_delete.append(ch_id)
+        for d in to_delete:
+            channels.pop(d, None)
+        if not channels:
+            obs.pop(epoch)
 
 
 @dataclass(frozen=True)
@@ -99,8 +121,75 @@ class GnssSignalChannel:
         ephemeris: Any,
     ) -> None:
         """Compute and store satellite information."""
+        from utilities import satellite_utils
 
-        # TODO: Implement satellite position and velocity computation
+        const = self.signal_id.signal_type.constellation
+        if const == Constellation.GPS:
+            mu = gnssConst.GpsConstants.MU
+            omega_e = gnssConst.GpsConstants.OMEGA_DOT_E
+            F_relativistic = gnssConst.GpsConstants.F
+            tgd = ephemeris.tgd
+            if self.signal_id.signal_type.obs_code == 1:
+                group_delay_s = tgd
+            elif self.signal_id.signal_type.obs_code == 2:
+                group_delay_s = (
+                    tgd * gnssConst.GpsConstants.L1_FREQ_SQUARE_D_L2_FREQ_SQUARE
+                )
+            elif self.signal_id.signal_type.obs_code == 5:
+                raise ValueError(
+                    "Group delay for L5 signal is not supported in this routine"
+                )
+            else:
+                raise ValueError(
+                    f"Unsupported observation code {self.signal_id.signal_type.obs_code} for GPS"
+                )
+        elif const == Constellation.GAL:
+            mu = gnssConst.GalConstants.MU
+            omega_e = gnssConst.GalConstants.OMEGA_DOT_E
+            F_relativistic = gnssConst.GalConstants.F
+            if self.signal_id.signal_type.obs_code == 1:
+                group_delay_s = ephemeris.bgd_e1e5b
+            elif self.signal_id.signal_type.obs_code == 5:
+                group_delay_s = ephemeris.bgd_e1e5a
+            elif self.signal_id.signal_type.obs_code == 7:
+                group_delay_s = ephemeris.bgd_e1e5b
+            else:
+                raise ValueError(
+                    f"Unsupported observation code {self.signal_id.signal_type.obs_code} for Galileo"
+                )
+        elif const == Constellation.BDS:
+            mu = gnssConst.BdsConstants.MU
+            omega_e = gnssConst.BdsConstants.OMEGA_DOT_E
+            F_relativistic = gnssConst.BdsConstants.F
+            if self.signal_id.signal_type.obs_code == 2:
+                group_delay_s = ephemeris.tgd1
+            elif self.signal_id.signal_type.obs_code == 7:
+                group_delay_s = ephemeris.tgd2
+            else:
+                raise ValueError(
+                    f"Unsupported observation code {self.signal_id.signal_type.obs_code} for BDS"
+                )
+        else:
+            raise ValueError("Invalid constellation for this routine")
+        try:
+            t_sv = self.time.minus_float_seconds(
+                self.code_m / gnssConst.SPEED_OF_LIGHT_MS
+            )
+            (
+                self.sat_pos_ecef_m,
+                self.sat_vel_ecef_m,
+                self.sat_clock_bias_m,
+                self.sat_group_delay_m,
+                self.sat_clock_drift_mps,
+            ) = satellite_utils.compute_satellite_info(
+                t_sv, const, ephemeris, mu, omega_e, F_relativistic, group_delay_s
+            )
+        except:
+            raise ValueError("Failed to compute satellite information")
+
+        self.code_m -= self.sat_clock_bias_m + self.sat_group_delay_m
+        self.phase_m -= self.sat_clock_bias_m
+        self.doppler_mps -= self.sat_clock_drift_mps
 
 
 class GnssMeasurementChannel(GnssSignalChannel):
@@ -190,8 +279,8 @@ class EphemerisData:
         else:
             raise ValueError(f"Unsupported constellation {constellation}")
 
-    def _resetIndexLookup(self) -> None:
-        """Reset the index lookup for the given constellation."""
+    def resetIndexLookup(self) -> None:
+        """Reset the ephemeris index lookup tables."""
         for key in self.gps_eph_index_lookup:
             self.gps_eph_index_lookup[key] = 0
         for key in self.glo_eph_index_lookup:
@@ -237,41 +326,52 @@ class EphemerisData:
         return eph_list[idx][1]
 
 
-class GpsEphemeris:
-    """Class to hold GPS ephemeris parameters. See RINEX 3.03 documentation for details."""
+class CdmaEphemeris:
+    """Class to hold CDMA ephemeris common parameters."""
 
     def __init__(self):
         self.prn = nan
-        self.toc = nan  # Time of Clock (represented in GpsTime)
-        self.sv_clock_bias = nan
-        self.sv_clock_drift = nan
-        self.sv_clock_drift_rate = nan
-        self.iode = nan
-        self.crs = nan
-        self.delta_n = nan
-        self.m0 = nan
-        self.cuc = nan
-        self.ecc = nan
-        self.cus = nan
-        self.sqrtA = nan
-        self.toe = nan  # Time of Ephemeris (represented in GpsTime)
-        self.cic = nan
-        self.omega0 = nan
-        self.cis = nan
-        self.i0 = nan
-        self.crc = nan
-        self.omega = nan
-        self.omega_dot = nan
-        self.idot = nan
-        self.code_on_L2 = nan
-        self.gps_week = nan
-        self.l2p_data_flag = nan
-        self.sv_accuracy = nan
-        self.sv_health = nan  # 0: healthy
-        self.tgd = nan
-        self.iodc = nan
-        self.transmission_time = nan  # Time of Transmission (represented in GpsTime)
-        self.fit_interval = nan
+        self.toc: GpsTime = None  # Time of Clock (represented in GpsTime)
+        self.toc_str: str = ""
+        self.sv_clock_bias: float = nan
+        self.sv_clock_drift: float = nan
+        self.sv_clock_drift_rate: float = nan
+        self.crs: float = nan
+        self.delta_n: float = nan
+        self.m0: float = nan
+        self.cuc: float = nan
+        self.ecc: float = nan
+        self.cus: float = nan
+        self.sqrtA: float = nan
+        self.toe_sec: float = nan  # Time of Ephemeris in seconds of system week
+        self.toe: GpsTime = None  # Time of Ephemeris (represented in GpsTime)
+        self.cic: float = nan
+        self.omega0: float = nan
+        self.cis: float = nan
+        self.i0: float = nan
+        self.crc: float = nan
+        self.omega: float = nan
+        self.omega_dot: float = nan
+        self.idot: float = nan
+
+
+class GpsEphemeris(CdmaEphemeris):
+    """Class to hold GPS ephemeris parameters. See RINEX 3.03 documentation for details."""
+
+    def __init__(self):
+        super().__init__()
+        self.iode: float = nan
+        self.code_on_L2: float = nan
+        self.gps_week: int = nan
+        self.l2p_data_flag: int = nan
+        self.sv_accuracy: float = nan
+        self.sv_health: int = nan  # 0: healthy
+        self.tgd: float = nan
+        self.iodc: float = nan
+        self.transmission_time: GpsTime = (
+            None  # Time of Transmission (represented in GpsTime)
+        )
+        self.fit_interval: float = nan
 
 
 class GloEphemeris:
@@ -279,98 +379,65 @@ class GloEphemeris:
 
     def __init__(self):
         self.prn = nan
-        self.toc = nan  # Time of Clock (represented in GpsTime)
-        self.sv_clock_bias = nan
-        self.sv_relative_freq_bias = nan
-        self.message_frame_time = nan
-        self.x_pos = nan
-        self.x_vel = nan
-        self.x_acc = nan
-        self.health = nan
-        self.y_pos = nan
-        self.y_vel = nan
-        self.y_acc = nan
-        self.freq_number = nan
-        self.z_pos = nan
-        self.z_vel = nan
-        self.z_acc = nan
-        self.age_of_oper_info = nan
+        self.toc: GpsTime = None  # Time of Clock (represented in GpsTime)
+        self.toc_str: str = ""
+        self.sv_clock_bias: float = nan
+        self.sv_relative_freq_bias: float = nan
+        self.message_frame_time: float = nan
+        self.x_pos: float = nan
+        self.x_vel: float = nan
+        self.x_acc: float = nan
+        self.health: int = nan
+        self.y_pos: float = nan
+        self.y_vel: float = nan
+        self.y_acc: float = nan
+        self.freq_number: int = (
+            -100
+        )  # Frequency number (-7<->+13, -100 if not applicable)
+        self.z_pos: float = nan
+        self.z_vel: float = nan
+        self.z_acc: float = nan
+        self.age_of_oper_info: float = nan
 
 
 class GalEphemeris:
     """Class to hold Galileo ephemeris parameters. See RINEX 3.03 documentation for details."""
 
     def __init__(self):
-        self.prn = nan
-        self.toc = nan  # Time of Clock (represented in GpsTime)
-        self.sv_clock_bias = nan
-        self.sv_clock_drift = nan
-        self.sv_clock_drift_rate = nan
-        self.iod_nav = nan
-        self.crs = nan
-        self.delta_n = nan
-        self.m0 = nan
-        self.cuc = nan
-        self.ecc = nan
-        self.cus = nan
-        self.sqrtA = nan
-        self.toe = nan  # Time of Ephemeris (represented in GpsTime)
-        self.cic = nan
-        self.omega0 = nan
-        self.cis = nan
-        self.i0 = nan
-        self.crc = nan
-        self.omega = nan
-        self.omega_dot = nan
-        self.idot = nan
-        self.data_source = ""  # "F-NAV" or "I-NAV". Currently use "F-NAV" only
-        self.gal_week = nan
-        self.sisa = nan
-        self.sv_health = nan  # 0: healthy
-        self.bgd_e1e5a = nan
-        self.bgd_e1e5b = nan
-        self.iodnav = nan
-        self.transmission_time = nan  # Time of Transmission (represented in GpsTime)
+        super().__init__()
+        self.iod_nav: float = nan
+        self.data_source: int = -1
+        self.gal_week: int = nan
+        self.sisa: float = nan
+        self.sv_health: int = nan  # 0: healthy
+        self.bgd_e1e5a: float = nan
+        self.bgd_e1e5b: float = nan
+        self.iodnav: float = nan
+        self.transmission_time: GpsTime = (
+            None  # Time of Transmission (represented in GpsTime)
+        )
 
         # Health status flags based on sv_health value.
-        self.e1b_is_valid = False
-        self.e1b_is_health = False
-        self.e5a_is_valid = False
-        self.e5a_is_health = False
-        self.e5b_is_valid = False
-        self.e5b_is_health = False
+        self.e1b_is_valid: bool = False
+        self.e1b_is_health: bool = False
+        self.e5a_is_valid: bool = False
+        self.e5a_is_health: bool = False
+        self.e5b_is_valid: bool = False
+        self.e5b_is_health: bool = False
 
 
 class BdsEphemeris:
     """Class to hold BeiDou ephemeris parameters. See RINEX 3.03 documentation for details."""
 
     def __init__(self):
-        self.prn = nan
-        self.toc = nan  # Time of Clock (represented in GpsTime)
-        self.sv_clock_bias = nan
-        self.sv_clock_drift = nan
-        self.sv_clock_drift_rate = nan
-        self.aode = nan
-        self.crs = nan
-        self.delta_n = nan
-        self.m0 = nan
-        self.cuc = nan
-        self.ecc = nan
-        self.cus = nan
-        self.sqrtA = nan
-        self.toe = nan  # Time of Ephemeris (represented in GpsTime)
-        self.cic = nan
-        self.omega0 = nan
-        self.cis = nan
-        self.i0 = nan
-        self.crc = nan
-        self.omega = nan
-        self.omega_dot = nan
-        self.idot = nan
-        self.bds_week = nan
-        self.sv_accuracy = nan
-        self.sv_health = nan  # 0: healthy
-        self.tgd1 = nan  # B1-B3
-        self.tgd2 = nan  # B1-B2
-        self.transmission_time = nan  # Time of Transmission (represented in GpsTime)
-        self.aodc = nan
+        super().__init__()
+        self.aode: float = None
+        self.bds_week: int = None
+        self.sv_accuracy: float = None
+        self.sv_health: int = None  # 0: healthy
+        self.tgd1: float = None  # B1-B3
+        self.tgd2: float = None  # B1-B2
+        self.transmission_time: GpsTime = (
+            None  # Time of Transmission (represented in GpsTime)
+        )
+        self.aodc: float = None

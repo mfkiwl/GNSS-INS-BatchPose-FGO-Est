@@ -21,7 +21,7 @@ from typing import Dict, Iterable, List, Tuple, Type
 import pandas as pd
 
 import constants.gnss_constants as gnssConst
-from utilities.gnss_data_structures import (
+from utilities.gnss_data_utils import (
     Constellation,
     GnssMeasurementChannel,
     SignalChannelId,
@@ -106,6 +106,7 @@ def parse_rinex_obs(
     file_path: str,
     *,
     interval: int = 1,
+    obs_channel_to_use: Dict[str, set[str]] = RINEX_OBS_CHANNEL_TO_USE,
 ) -> Dict[GpsTime, set[GnssMeasurementChannel]]:
     """Parse a RINEX observation file.
 
@@ -168,7 +169,7 @@ def parse_rinex_obs(
                     break
                 sys_char = sat_line[0]
                 if (
-                    sys_char not in RINEX_OBS_CHANNEL_TO_USE
+                    sys_char not in obs_channel_to_use
                     or sys_char not in _SYS_CHAR_TO_CONSTEL_MAP
                     # Check if constellation is enabled
                     or not _SYS_CHAR_TO_CONSTEL_MAP[sys_char][1]
@@ -212,7 +213,7 @@ def parse_rinex_obs(
                     meas_map.setdefault(key, {})[t[0]] = val
 
                 prn = int(prn_id[1:])
-                allowed = RINEX_OBS_CHANNEL_TO_USE.get(sys_char, set())
+                allowed = obs_channel_to_use.get(sys_char, set())
                 for (obs_code, chan_id), meas in meas_map.items():
                     if f"{obs_code}{chan_id}" not in allowed:
                         continue
@@ -233,13 +234,13 @@ def parse_rinex_obs(
                         continue
 
                     wavelength_m = _get_wavelength_m(
-                        _SYS_CHAR_TO_CONSTEL_MAP[sys_char], prn, obs_code
+                        _SYS_CHAR_TO_CONSTEL_MAP[sys_char][0], prn, obs_code
                     )
                     phase_m = phase_cycles * wavelength_m
                     doppler_mps = -doppler_hz * wavelength_m
 
                     signal = SignalType(
-                        _SYS_CHAR_TO_CONSTEL_MAP[sys_char], obs_code, chan_id
+                        _SYS_CHAR_TO_CONSTEL_MAP[sys_char][0], obs_code, chan_id
                     )
                     signal_id = SignalChannelId(prn, signal)
 

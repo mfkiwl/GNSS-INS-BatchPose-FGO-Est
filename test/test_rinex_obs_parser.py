@@ -7,7 +7,14 @@ import unittest
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from utilities.rinex_obs_parser import parse_rinex_obs
-from utilities.gnss_data_structures import SignalType, SignalChannelId, Constellation
+from utilities.gnss_data_utils import SignalType, SignalChannelId, Constellation
+
+RINEX_OBS_CHANNEL_TO_USE_FOR_TEST: dict[str, set[str]] = {
+    "G": {"1C", "2L"},
+    "R": {"1C", "2C"},
+    "E": {"1C", "5Q"},
+    "C": {"2I"},
+}
 
 
 class TestRinexObsParser(unittest.TestCase):
@@ -40,7 +47,9 @@ class TestRinexObsParser(unittest.TestCase):
     def test_simple_parse(self):
         tmp = self._create_sample()
         try:
-            result = parse_rinex_obs(tmp.name)
+            result = parse_rinex_obs(
+                tmp.name, obs_channel_to_use=RINEX_OBS_CHANNEL_TO_USE_FOR_TEST
+            )
         finally:
             tmp.close()
             os.unlink(tmp.name)
@@ -50,7 +59,7 @@ class TestRinexObsParser(unittest.TestCase):
         channels = result[epoch]
         self.assertEqual(len(channels), 8 + 4 + 0)
 
-        from utilities.gnss_data_structures import (
+        from utilities.gnss_data_utils import (
             SignalChannelId,
             SignalType,
             Constellation,
@@ -72,7 +81,9 @@ class TestRinexObsParser(unittest.TestCase):
     def test_edge_cases(self):
         tmp = self._create_sample()
         try:
-            result = parse_rinex_obs(tmp.name)
+            result = parse_rinex_obs(
+                tmp.name, obs_channel_to_use=RINEX_OBS_CHANNEL_TO_USE_FOR_TEST
+            )
         finally:
             tmp.close()
             os.unlink(tmp.name)
