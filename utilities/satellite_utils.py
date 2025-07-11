@@ -148,19 +148,19 @@ def _gps_gal_bds_sat_info(
         pos,
         vel,
         clock_bias * gnssConst.SPEED_OF_LIGHT_MS,
-        group_delay_s * gnssConst.SPEED_OF_LIGHT_MS,
         clock_drift * gnssConst.SPEED_OF_LIGHT_MS,
     )
 
 
-def _glo_sat_info(
+def compute_glo_sat_info(
     t_sv: GpsTime, eph: GloEphemeris
 ) -> Tuple[np.ndarray, np.ndarray, float, float, float]:
-    # TODO: Debug and validate GLONASS satellite position and clock computation
-    tk = t_sv - eph.toc
-    clock_bias = eph.sv_clock_bias + eph.sv_relative_freq_bias * tk
-    t_corr = t_sv.gps_timestamp - clock_bias
-    tk = t_corr - eph.toc.gps_timestamp
+    dt = t_sv - eph.toc
+    clock_bias = eph.sv_clock_bias + eph.sv_relative_freq_bias * dt
+    t_corr = t_sv.minus_float_seconds(
+        clock_bias
+    )  # Corrected time of signal transmission
+    tk = t_corr - eph.toc
 
     state = np.array(
         [
@@ -174,7 +174,7 @@ def _glo_sat_info(
     )
     acc = np.array([eph.x_acc, eph.y_acc, eph.z_acc])
 
-    def _ode(y):
+    def _differentialEqn(y):
         x, y_, z, vx, vy, vz = y
         r = math.sqrt(x * x + y_ * y_ + z * z)
         mu = gnssConst.GloConstants.MU
@@ -202,50 +202,50 @@ def _glo_sat_info(
         )
         return np.array([vx, vy, vz, ax, ay, az])
 
+    # Runge-Kutta 4th order integration
     h = 60.0 if tk >= 0 else -60.0
     t = 0.0
     steps = int(tk / h)
     rem = tk - steps * h
     y = state.copy()
     for _ in range(abs(steps)):
-        k1 = _ode(y)
-        k2 = _ode(y + 0.5 * h * k1)
-        k3 = _ode(y + 0.5 * h * k2)
-        k4 = _ode(y + h * k3)
+        k1 = _differentialEqn(y)
+        k2 = _differentialEqn(y + 0.5 * h * k1)
+        k3 = _differentialEqn(y + 0.5 * h * k2)
+        k4 = _differentialEqn(y + h * k3)
         y += (h / 6.0) * (k1 + 2 * k2 + 2 * k3 + k4)
         t += h
     if abs(rem) > 0:
-        k1 = _ode(y)
-        k2 = _ode(y + 0.5 * rem * k1)
-        k3 = _ode(y + 0.5 * rem * k2)
-        k4 = _ode(y + rem * k3)
+        k1 = _differentialEqn(y)
+        k2 = _differentialEqn(y + 0.5 * rem * k1)
+        k3 = _differentialEqn(y + 0.5 * rem * k2)
+        k4 = _differentialEqn(y + rem * k3)
         y += (rem / 6.0) * (k1 + 2 * k2 + 2 * k3 + k4)
 
     pos = y[:3]
     vel = y[3:]
 
-    bias_plus = eph.sv_clock_bias + eph.sv_relative_freq_bias * (tk + 0.001)
-    clock_drift = (bias_plus - clock_bias) / 0.001
-
     return (
         pos,
         vel,
         clock_bias * gnssConst.SPEED_OF_LIGHT_MS,
-        0.0,
-        clock_drift * gnssConst.SPEED_OF_LIGHT_MS,
+        eph.sv_relative_freq_bias * gnssConst.SPEED_OF_LIGHT_MS,
     )
 
 
 def compute_satellite_info(
     t_sv: GpsTime,  # Signal pseudo transmission time
     constellation: Constellation,
-    eph: CdmaEphemeris | GloEphemeris,
+    eph: CdmaEphemeris,
     mu: float = None,
     omega_e: float = None,
     F_relativistic: float = None,
     group_delay_s: float = None,
-) -> Tuple[np.ndarray, np.ndarray, float, float, float]:
-    """General dispatcher for satellite information computation."""
+) -> Tuple[np.ndarray, np.ndarray, float, float]:
+    """
+    General dispatcher for satellite information computation.
+    Return: satellite position, velocity, clock bias, and clock drift
+    """
 
     if constellation in (Constellation.GPS, Constellation.GAL, Constellation.BDS):
         if (
@@ -260,6 +260,4 @@ def compute_satellite_info(
         return _gps_gal_bds_sat_info(
             t_sv, eph, constellation, mu, omega_e, F_relativistic, group_delay_s
         )
-    if constellation == Constellation.GLO:
-        return _glo_sat_info(t_sv, eph)
     raise ValueError("Unsupported constellation")

@@ -16,7 +16,7 @@ class GnssParameters:
 
 RINEX_OBS_CHANNEL_TO_USE: dict[str, set[str]] = {
     "G": {"1C", "2L"},
-    # "R": {"1C", "2C"}, # TODO: Enable GLONASS after validating the implementation
+    "R": {"1C", "2C"},
     "E": {"1C", "7Q"},
     "C": {"2I"},
 }

@@ -124,6 +124,27 @@ class GnssSignalChannel:
         from utilities import satellite_utils
 
         const = self.signal_id.signal_type.constellation
+
+        t_sv = self.time.minus_float_seconds(self.code_m / gnssConst.SPEED_OF_LIGHT_MS)
+
+        if const == Constellation.GLO:
+            try:
+                (
+                    self.sat_pos_ecef_m,
+                    self.sat_vel_ecef_m,
+                    self.sat_clock_bias_m,
+                    self.sat_clock_drift_mps,
+                ) = satellite_utils.compute_glo_sat_info(t_sv, ephemeris)
+            except ValueError as e:
+                raise ValueError(
+                    f"Failed to compute GLONASS satellite information: {e}"
+                )
+            # Clock bias has been adjusted by group delay
+            self.code_m += self.sat_clock_bias_m
+            self.phase_m += self.sat_clock_bias_m
+            self.doppler_mps += self.sat_clock_drift_mps
+            return
+
         if const == Constellation.GPS:
             mu = gnssConst.GpsConstants.MU
             omega_e = gnssConst.GpsConstants.OMEGA_DOT_E
@@ -172,14 +193,10 @@ class GnssSignalChannel:
         else:
             raise ValueError("Invalid constellation for this routine")
         try:
-            t_sv = self.time.minus_float_seconds(
-                self.code_m / gnssConst.SPEED_OF_LIGHT_MS
-            )
             (
                 self.sat_pos_ecef_m,
                 self.sat_vel_ecef_m,
                 self.sat_clock_bias_m,
-                self.sat_group_delay_m,
                 self.sat_clock_drift_mps,
             ) = satellite_utils.compute_satellite_info(
                 t_sv, const, ephemeris, mu, omega_e, F_relativistic, group_delay_s
@@ -187,9 +204,10 @@ class GnssSignalChannel:
         except:
             raise ValueError("Failed to compute satellite information")
 
-        self.code_m -= self.sat_clock_bias_m + self.sat_group_delay_m
-        self.phase_m -= self.sat_clock_bias_m
-        self.doppler_mps -= self.sat_clock_drift_mps
+        # Clock bias has been adjusted by group delay
+        self.code_m += self.sat_clock_bias_m
+        self.phase_m += self.sat_clock_bias_m
+        self.doppler_mps += self.sat_clock_drift_mps
 
 
 class GnssMeasurementChannel(GnssSignalChannel):
@@ -310,17 +328,29 @@ class EphemerisData:
             return None
         idx = index_lookup.get(prn, 0)
 
-        # Move index forward to the first ephemeris time greater than gps_time
-        while idx < len(eph_list) and gps_time > eph_list[idx][0]:
-            idx += 1
+        if constellation == Constellation.GLO:
+            # For GLONASS, | gps_time - eph_epoch_time | < 15 minutes
+            while idx < len(eph_list):
+                if abs(gps_time - eph_list[idx][0]) <= 15 * 60:
+                    # Find the target ephemeris index
+                    break
+                if eph_list[idx][0] - gps_time > 15 * 60:
+                    # If the next ephemeris time is more than 15 minutes ahead, stop searching
+                    # This also means the previous ephemeris does not cover gps_time
+                    return None
+                idx += 1
+        else:
+            # Move index forward to the first ephemeris time greater than gps_time
+            while idx < len(eph_list) and gps_time > eph_list[idx][0]:
+                idx += 1
 
-        if idx >= len(eph_list):
-            return None
+            if idx >= len(eph_list):
+                return None
 
-        # eph_list[idx] is tuple of (GpsTime, Ephemeris)
-        diff = eph_list[idx][0] - gps_time
-        if diff < 0 or diff >= max_dur:
-            return None
+            # eph_list[idx] is tuple of (GpsTime, Ephemeris)
+            diff = eph_list[idx][0] - gps_time
+            if diff < 0 or diff >= max_dur:
+                return None
 
         index_lookup[prn] = idx
         return eph_list[idx][1]

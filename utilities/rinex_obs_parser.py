@@ -233,6 +233,8 @@ def parse_rinex_obs(
                         # Code and phase must be valid measurements
                         continue
 
+                    # TODO: Set wavelength_m in Satellite position computation, for GLO, the channel
+                    # number should be obtained from the Ephemeris data directly.
                     wavelength_m = _get_wavelength_m(
                         _SYS_CHAR_TO_CONSTEL_MAP[sys_char][0], prn, obs_code
                     )

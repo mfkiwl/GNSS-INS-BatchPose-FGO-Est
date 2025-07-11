@@ -101,20 +101,8 @@ class GloConstants:
     # RINEX 3.04 Obs Code Number: 1
     L1_FREQ_HZ = 1602.00e6
 
-    # Wavelength of L1 frequency in meters
-    L1_WAVELENGTH_M = SPEED_OF_LIGHT_MS / L1_FREQ_HZ
-
     # RINEX 3.04 Obs Code Number: 2
     L2_FREQ_HZ = 1246.00e6
-
-    # Wavelength of L2 frequency in meters
-    L2_WAVELENGTH_M = SPEED_OF_LIGHT_MS / L2_FREQ_HZ
-
-    # Mapping of observation code number to frequency
-    ObsCodeToFreq = {1: L1_FREQ_HZ, 2: L2_FREQ_HZ}
-
-    # Mapping of observation code number to wavelength
-    ObsCodeToWavelength = {1: L1_WAVELENGTH_M, 2: L2_WAVELENGTH_M}
 
     # Maximum duration to use ephemeris in seconds
     MAX_DURATION_TO_EPH = 1800.0
@@ -167,11 +155,11 @@ class GloConstants:
             raise ValueError(f"Invalid GLONASS channel number: {channel_num}")
         match obs_code:
             case 1:
-                return 1602.0e6 + channel_num * 9.0 / 16.0
+                return 1602.0e6 + channel_num * 5.625e5
             case 4:
                 return 1600.995e6
             case 2:
-                return 1246.0e6 + channel_num * 7.0 / 16.0
+                return 1246.0e6 + channel_num * 4.375e5
             case 6:
                 return 1248.06e6
             case 3:
