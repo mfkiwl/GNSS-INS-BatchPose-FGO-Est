@@ -107,7 +107,7 @@ def parse_rinex_obs(
     *,
     interval: int = 1,
     obs_channel_to_use: Dict[str, set[str]] = RINEX_OBS_CHANNEL_TO_USE,
-) -> Dict[GpsTime, set[GnssMeasurementChannel]]:
+) -> Dict[GpsTime, Dict[SignalChannelId, GnssMeasurementChannel]]:
     """Parse a RINEX observation file.
 
     Parameters
