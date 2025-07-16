@@ -227,6 +227,7 @@ class GnssMeasurementChannel(GnssSignalChannel):
         self.correction_phase_m = (
             None  # Correction phase in meters (For DGNSS/RTK, including ambiguity)
         )
+        self.correction_doppler_mps = None  # Correction for Doppler in m/s
 
         self.sigma_code_m = None  # Standard deviation of code measurement in meters
         self.sigma_phase_m = None  # Standard deviation of phase measurement in meters
@@ -236,6 +237,17 @@ class GnssMeasurementChannel(GnssSignalChannel):
 
     def __hash__(self):
         return hash((self.time, self.signal_id))
+
+    def applyRangeCorrections(self) -> None:
+        """Apply corrections to measurements."""
+        if self.code_m is None or self.phase_m is None:
+            raise ValueError("Measurements must be set before applying corrections")
+
+        if self.correction_code_m is None or self.correction_phase_m is None:
+            raise ValueError("Corrections must be set before applying them")
+
+        self.code_m -= self.correction_code_m
+        self.phase_m -= self.correction_phase_m
 
 
 class EphemerisData:

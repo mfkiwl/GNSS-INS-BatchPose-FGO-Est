@@ -21,6 +21,13 @@ from utilities.gnss_data_utils import (
 )
 from utilities.time_utils import GpsTime
 
+OMEGA_E_DIV_C = gnssConst.GpsConstants.OMEGA_DOT_E / gnssConst.SPEED_OF_LIGHT_MS
+
+
+def sagnac_correction(recv_pos: np.ndarray, sat_pos: np.ndarray) -> float:
+    """Compute Sagnac effect correction in meters."""
+    return OMEGA_E_DIV_C * (recv_pos[1] * sat_pos[0] - recv_pos[0] * sat_pos[1])
+
 
 def _kepler_anomaly(ecc: float, mean_anom: float) -> float:
     """Solve Kepler's equation for eccentric anomaly."""
