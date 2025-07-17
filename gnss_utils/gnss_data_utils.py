@@ -5,10 +5,12 @@ from typing import Dict, Any, Optional, TYPE_CHECKING
 
 from numpy import nan
 import constants.gnss_constants as gnssConst
+import numpy as np
 from constants.gnss_constants import Constellation
+from constants.parameters import BASE_POS_ECEF
 
 if TYPE_CHECKING:
-    from utilities.time_utils import GpsTime
+    from gnss_utils.time_utils import GpsTime
 
 from dataclasses import dataclass
 
@@ -39,6 +41,50 @@ def apply_ephemerides_to_obs(
             channels.pop(d, None)
         if not channels:
             obs.pop(epoch)
+
+
+def apply_base_corrections(
+    rover_obs: Dict[GpsTime, Dict[SignalChannelId, GnssMeasurementChannel]],
+    base_obs: Dict[GpsTime, Dict[SignalChannelId, GnssMeasurementChannel]],
+) -> None:
+    """Apply differential corrections from base station observations."""
+
+    from gnss_utils import satellite_utils
+
+    base_epochs = sorted(base_obs.keys())
+    if not base_epochs:
+        return
+
+    base_idx = 0
+    base_pos = np.asarray(BASE_POS_ECEF)
+
+    for epoch in sorted(list(rover_obs.keys())):
+        while base_idx < len(base_epochs) - 1 and base_epochs[base_idx + 1] <= epoch:
+            base_idx += 1
+
+        if base_epochs[base_idx] > epoch:
+            rover_obs.pop(epoch, None)
+            continue
+
+        base_channels = base_obs[base_epochs[base_idx]]
+        rover_channels = rover_obs[epoch]
+        to_delete = []
+        for channel_id, channel in rover_channels.items():
+            base_ch = base_channels.get(channel_id)
+            if base_ch is None or base_ch.sat_pos_ecef_m is None:
+                to_delete.append(channel_id)
+                continue
+            geometric_range = np.linalg.norm(
+                base_pos - base_ch.sat_pos_ecef_m
+            ) + satellite_utils.sagnac_correction(base_pos, base_ch.sat_pos_ecef_m)
+            channel.correction_code_m = base_ch.code_m - geometric_range
+            channel.correction_phase_m = base_ch.phase_m - geometric_range
+            channel.correction_doppler_mps = base_ch.doppler_mps
+            channel.applyRangeCorrections()
+        for d in to_delete:
+            rover_channels.pop(d, None)
+        if not rover_channels:
+            rover_obs.pop(epoch, None)
 
 
 @dataclass(frozen=True)
@@ -121,7 +167,7 @@ class GnssSignalChannel:
         ephemeris: Any,
     ) -> None:
         """Compute and store satellite information."""
-        from utilities import satellite_utils
+        from gnss_utils import satellite_utils
 
         const = self.signal_id.signal_type.constellation
 

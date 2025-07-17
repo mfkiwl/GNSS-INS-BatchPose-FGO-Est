@@ -1,6 +1,6 @@
 import pandas as pd
 import constants.gnss_constants as gnssConst
-from utilities.gnss_data_utils import Constellation
+from gnss_utils.gnss_data_utils import Constellation
 
 
 GAL_START_TIME_OFFSET_TO_GPS = (

@@ -8,7 +8,7 @@ from typing import Tuple
 import numpy as np
 
 import constants.gnss_constants as gnssConst
-from utilities.gnss_data_utils import (
+from gnss_utils.gnss_data_utils import (
     Constellation,
     CdmaEphemeris,
     EphemerisData,
@@ -19,7 +19,7 @@ from utilities.gnss_data_utils import (
     GnssMeasurementChannel,
     SignalChannelId,
 )
-from utilities.time_utils import GpsTime
+from gnss_utils.time_utils import GpsTime
 
 OMEGA_E_DIV_C = gnssConst.GpsConstants.OMEGA_DOT_E / gnssConst.SPEED_OF_LIGHT_MS
 

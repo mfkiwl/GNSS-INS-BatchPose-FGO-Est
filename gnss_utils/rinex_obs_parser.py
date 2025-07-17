@@ -21,14 +21,14 @@ from typing import Dict, Iterable, List, Tuple, Type
 import pandas as pd
 
 import constants.gnss_constants as gnssConst
-from utilities.gnss_data_utils import (
+from gnss_utils.gnss_data_utils import (
     Constellation,
     GnssMeasurementChannel,
     SignalChannelId,
     SignalType,
 )
-from utilities.parameters import GnssParameters, RINEX_OBS_CHANNEL_TO_USE
-from utilities.time_utils import GpsTime
+from constants.parameters import GnssParameters, RINEX_OBS_CHANNEL_TO_USE
+from gnss_utils.time_utils import GpsTime
 
 
 _SYS_CHAR_TO_CONSTEL_MAP: Dict[str, Tuple[Constellation, bool]] = {

@@ -6,7 +6,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 
 import numpy as np
 
-from utilities.gnss_data_utils import (
+from gnss_utils.gnss_data_utils import (
     Constellation,
     EphemerisData,
     GpsEphemeris,
@@ -14,8 +14,8 @@ from utilities.gnss_data_utils import (
     SignalChannelId,
     SignalType,
 )
-from utilities.time_utils import GpsTime
-from utilities.gnss_data_utils import apply_ephemerides_to_obs
+from gnss_utils.time_utils import GpsTime
+from gnss_utils.gnss_data_utils import apply_ephemerides_to_obs
 
 
 class TestSatelliteUtils(unittest.TestCase):
@@ -23,7 +23,15 @@ class TestSatelliteUtils(unittest.TestCase):
         epoch = GpsTime.fromWeekAndTow(0, 0)
         ch_id = SignalChannelId(1, SignalType(Constellation.GPS, 1, "C"))
         ch = GnssMeasurementChannel()
-        ch.addMeasurementFromObs(epoch, ch_id, "G01", 100.0, 50.0, 0.0, 45.0)
+        ch.addMeasurementFromObs(
+            time=epoch,
+            signal_id=ch_id,
+            svid="G01",
+            code_m=100.0,
+            phase_m=50.0,
+            doppler_mps=0.0,
+            cn0_dbhz=45.0,
+        )
         obs = {epoch: {ch_id: ch}}
         eph = EphemerisData()
         apply_ephemerides_to_obs(obs, eph)
@@ -52,7 +60,15 @@ class TestSatelliteUtils(unittest.TestCase):
         epoch = GpsTime.fromWeekAndTow(0, 60)
         ch_id = SignalChannelId(1, SignalType(Constellation.GPS, 1, "C"))
         ch = GnssMeasurementChannel()
-        ch.addMeasurementFromObs(epoch, ch_id, "G01", 2e7, 1000.0, -10.0, 45.0)
+        ch.addMeasurementFromObs(
+            time=epoch,
+            signal_id=ch_id,
+            svid="G01",
+            code_m=2e7,
+            phase_m=1000.0,
+            doppler_mps=-10.0,
+            cn0_dbhz=45.0,
+        )
 
         ch.computeSatelliteInformation(eph)
 
