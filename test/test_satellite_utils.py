@@ -6,7 +6,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 
 import numpy as np
 
-from utilities.gnss_data_utils import (
+from gnss_utils.gnss_data_utils import (
     Constellation,
     EphemerisData,
     GpsEphemeris,
@@ -14,8 +14,8 @@ from utilities.gnss_data_utils import (
     SignalChannelId,
     SignalType,
 )
-from utilities.time_utils import GpsTime
-from utilities.gnss_data_utils import apply_ephemerides_to_obs
+from gnss_utils.time_utils import GpsTime
+from gnss_utils.gnss_data_utils import apply_ephemerides_to_obs
 
 
 class TestSatelliteUtils(unittest.TestCase):

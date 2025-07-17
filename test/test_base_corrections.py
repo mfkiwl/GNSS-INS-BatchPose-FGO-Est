@@ -5,16 +5,16 @@ import numpy as np
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from utilities.gnss_data_utils import (
+from gnss_utils.gnss_data_utils import (
     apply_base_corrections,
     GnssMeasurementChannel,
     SignalChannelId,
     SignalType,
     Constellation,
 )
-from utilities.time_utils import GpsTime
-from utilities.parameters import BASE_POS_ECEF
-from utilities import satellite_utils
+from gnss_utils.time_utils import GpsTime
+from constants.parameters import BASE_POS_ECEF
+from gnss_utils import satellite_utils
 
 
 class TestBaseCorrections(unittest.TestCase):
@@ -66,17 +66,21 @@ class TestBaseCorrections(unittest.TestCase):
         apply_base_corrections(rover_obs, base_obs)
 
         base_pos = np.asarray(BASE_POS_ECEF)
-        geometric_range = np.linalg.norm(base_pos - base_ch.sat_pos_ecef_m) + satellite_utils.sagnac_correction(
-            base_pos, base_ch.sat_pos_ecef_m
-        )
+        geometric_range = np.linalg.norm(
+            base_pos - base_ch.sat_pos_ecef_m
+        ) + satellite_utils.sagnac_correction(base_pos, base_ch.sat_pos_ecef_m)
 
         expected_correction = base_ch.code_m - geometric_range
         self.assertAlmostEqual(rover_ch.correction_code_m, expected_correction)
-        self.assertAlmostEqual(rover_ch.correction_phase_m, base_ch.phase_m - geometric_range)
+        self.assertAlmostEqual(
+            rover_ch.correction_phase_m, base_ch.phase_m - geometric_range
+        )
         self.assertAlmostEqual(rover_ch.correction_doppler_mps, base_ch.doppler_mps)
 
         self.assertAlmostEqual(rover_ch.code_m, original_code - expected_correction)
-        self.assertAlmostEqual(rover_ch.phase_m, original_phase - (base_ch.phase_m - geometric_range))
+        self.assertAlmostEqual(
+            rover_ch.phase_m, original_phase - (base_ch.phase_m - geometric_range)
+        )
 
         self.assertNotIn(other_id, rover_obs[rover_epoch])
 

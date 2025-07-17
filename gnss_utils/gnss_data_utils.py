@@ -7,10 +7,10 @@ from numpy import nan
 import constants.gnss_constants as gnssConst
 import numpy as np
 from constants.gnss_constants import Constellation
-from utilities.parameters import BASE_POS_ECEF
+from constants.parameters import BASE_POS_ECEF
 
 if TYPE_CHECKING:
-    from utilities.time_utils import GpsTime
+    from gnss_utils.time_utils import GpsTime
 
 from dataclasses import dataclass
 
@@ -49,7 +49,7 @@ def apply_base_corrections(
 ) -> None:
     """Apply differential corrections from base station observations."""
 
-    from utilities import satellite_utils
+    from gnss_utils import satellite_utils
 
     base_epochs = sorted(base_obs.keys())
     if not base_epochs:
@@ -74,10 +74,9 @@ def apply_base_corrections(
             if base_ch is None or base_ch.sat_pos_ecef_m is None:
                 to_delete.append(channel_id)
                 continue
-            geometric_range = (
-                np.linalg.norm(base_pos - base_ch.sat_pos_ecef_m)
-                + satellite_utils.sagnac_correction(base_pos, base_ch.sat_pos_ecef_m)
-            )
+            geometric_range = np.linalg.norm(
+                base_pos - base_ch.sat_pos_ecef_m
+            ) + satellite_utils.sagnac_correction(base_pos, base_ch.sat_pos_ecef_m)
             channel.correction_code_m = base_ch.code_m - geometric_range
             channel.correction_phase_m = base_ch.phase_m - geometric_range
             channel.correction_doppler_mps = base_ch.doppler_mps
@@ -168,7 +167,7 @@ class GnssSignalChannel:
         ephemeris: Any,
     ) -> None:
         """Compute and store satellite information."""
-        from utilities import satellite_utils
+        from gnss_utils import satellite_utils
 
         const = self.signal_id.signal_type.constellation
 

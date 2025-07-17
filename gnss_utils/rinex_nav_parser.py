@@ -3,7 +3,7 @@
 import re
 import pandas as pd
 
-from utilities.gnss_data_utils import (
+from gnss_utils.gnss_data_utils import (
     Constellation,
     EphemerisData,
     GpsEphemeris,
@@ -11,7 +11,7 @@ from utilities.gnss_data_utils import (
     GalEphemeris,
     BdsEphemeris,
 )
-from utilities.time_utils import GpsTime
+from gnss_utils.time_utils import GpsTime
 
 
 _FLOAT_RE = re.compile(r"[-+]?\d*\.\d+(?:[Ee][+-]?\d+)?")

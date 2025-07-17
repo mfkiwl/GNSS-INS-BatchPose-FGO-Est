@@ -6,8 +6,8 @@ import unittest
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from utilities.rinex_obs_parser import parse_rinex_obs
-from utilities.gnss_data_utils import SignalType, SignalChannelId, Constellation
+from gnss_utils.rinex_obs_parser import parse_rinex_obs
+from gnss_utils.gnss_data_utils import SignalType, SignalChannelId, Constellation
 
 RINEX_OBS_CHANNEL_TO_USE_FOR_TEST: dict[str, set[str]] = {
     "G": {"1C", "2L"},
@@ -59,7 +59,7 @@ class TestRinexObsParser(unittest.TestCase):
         channels = result[epoch]
         self.assertEqual(len(channels), 8 + 4 + 0)
 
-        from utilities.gnss_data_utils import (
+        from gnss_utils.gnss_data_utils import (
             SignalChannelId,
             SignalType,
             Constellation,

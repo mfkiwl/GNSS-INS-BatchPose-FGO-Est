@@ -1,6 +1,6 @@
-from utilities.rinex_nav_parser import parse_rinex_nav
-from utilities.rinex_obs_parser import parse_rinex_obs
-from utilities.gnss_data_utils import apply_ephemerides_to_obs, apply_base_corrections
+from gnss_utils.rinex_nav_parser import parse_rinex_nav
+from gnss_utils.rinex_obs_parser import parse_rinex_obs
+from gnss_utils.gnss_data_utils import apply_ephemerides_to_obs, apply_base_corrections
 from constants.gnss_constants import Constellation
 
 

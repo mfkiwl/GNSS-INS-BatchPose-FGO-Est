@@ -5,8 +5,8 @@ import pandas as pd
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from utilities.time_utils import GpsTime
-from utilities.gnss_data_utils import Constellation
+from gnss_utils.time_utils import GpsTime
+from gnss_utils.gnss_data_utils import Constellation
 
 
 class TestGpsTime(unittest.TestCase):
