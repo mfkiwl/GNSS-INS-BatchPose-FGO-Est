@@ -1,6 +1,6 @@
 from utilities.rinex_nav_parser import parse_rinex_nav
 from utilities.rinex_obs_parser import parse_rinex_obs
-from utilities.gnss_data_utils import apply_ephemerides_to_obs
+from utilities.gnss_data_utils import apply_ephemerides_to_obs, apply_base_corrections
 from constants.gnss_constants import Constellation
 
 
@@ -17,6 +17,7 @@ if __name__ == "__main__":
     apply_ephemerides_to_obs(rover_obs, eph_data)
     eph_data.resetIndexLookup()
     apply_ephemerides_to_obs(base_obs, eph_data)
+    apply_base_corrections(rover_obs, base_obs)
 
     # Example usage: query GPS PRN 1 ephemeris at first epoch
     query_time = eph_data.gps_ephemerides[1][0][0]
