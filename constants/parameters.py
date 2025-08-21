@@ -59,6 +59,19 @@ class TexCupBoschImuParams:
     gravity: float = computeGravityConst(np.deg2rad(BASE_POS_LLA[0]))
     z_up: bool = True  # IMU z-axis points upward (GTSAM assumes Z axis pointing up)
 
+    acc_noise_std = np.full(
+        3, np.sqrt(0.1) * gravity / 1e3
+    )  # 0.1 mg^2/Hz > m/s^2/sqrt(Hz)
+    acc_bias_std = np.full(3, 10 * gravity / 1e3)  # 10 milli-g > m/s^2
+    gyro_noise_std = np.full(
+        3,
+        np.sqrt(0.02) * np.pi / 180,
+    )  # 0.02 (deg/s)^2/Hz -> rad/s/sqrt(Hz)
+    gyro_bias_std = np.full(
+        3,
+        200 * np.pi / 180 / 3600,
+    )  # 200 deg/h -> rad/s
+
 
 @dataclass
 class TexCupLordImuParams:
@@ -71,3 +84,14 @@ class TexCupLordImuParams:
 
     gravity: float = computeGravityConst(np.deg2rad(BASE_POS_LLA[0]))
     z_up: bool = False
+
+    acc_noise_std = np.full(3, 0.1 * gravity / 1e3)  # 0.1 mg/sqrt(Hz) > m/s^2/sqrt(Hz)
+    acc_bias_std = np.full(3, 0.5 * gravity / 1e3)  # 0.5 milli-g > m/s^2
+    gyro_noise_std = np.full(
+        3,
+        0.01 * np.pi / 180,
+    )  # 0.01 deg/s/sqrt(Hz) -> rad/s/sqrt(Hz)
+    gyro_bias_std = np.full(
+        3,
+        8 * np.pi / 180 / 3600,
+    )  # 8 deg/h -> rad/s
