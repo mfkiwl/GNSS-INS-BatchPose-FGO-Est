@@ -12,6 +12,12 @@ class Constellation(Enum):
     BDS = 4
 
 
+class CycleSlipType(Enum):
+    NOT_AVAILABLE = 0
+    DETECTED = 1
+    NOT_DETECTED = 2
+
+
 class EarthConstants:
     # Earth radius in meters
     RADIUS_M = 6378137.0

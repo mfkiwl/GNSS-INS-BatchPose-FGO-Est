@@ -256,6 +256,8 @@ class GnssSignalChannel:
         self.phase_m += self.sat_clock_bias_m
         self.doppler_mps += self.sat_clock_drift_mps
 
+        self.cycle_slip_status = gnssConst.CycleSlipType.NOT_AVAILABLE
+
 
 class GnssMeasurementChannel(GnssSignalChannel):
     """
