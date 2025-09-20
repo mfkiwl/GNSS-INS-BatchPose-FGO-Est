@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 import numpy as np
 import pymap3d as pm
+from gnss_utils.model_utils import compute_ecef_ned_rot_mat
 
 
 def computeGravityConst(lat_rad: float) -> float:
@@ -68,25 +69,7 @@ def BASE_ECEF_TO_NED_ROT_MAT():
         # C_e_n = [   -sin_lat*cos_lng -sin_lat*sin_lng   cos_lat; % Farrell eqn. 2.32
         #             -sin_lng          cos_lng           0;
         #             -cos_lat*cos_lng -cos_lat*sin_lng  -sin_lat];
-        _ecef_to_ned_rot = np.array(
-            [
-                [
-                    -np.sin(lla[0]) * np.cos(lla[1]),
-                    -np.sin(lla[0]) * np.sin(lla[1]),
-                    np.cos(lla[0]),
-                ],
-                [
-                    -np.sin(lla[1]),
-                    np.cos(lla[1]),
-                    0,
-                ],
-                [
-                    -np.cos(lla[0]) * np.cos(lla[1]),
-                    -np.cos(lla[0]) * np.sin(lla[1]),
-                    -np.sin(lla[0]),
-                ],
-            ]
-        )
+        _ecef_to_ned_rot = compute_ecef_ned_rot_mat(lla[0], lla[1])
     return _ecef_to_ned_rot
 
 
