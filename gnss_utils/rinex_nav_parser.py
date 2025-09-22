@@ -107,6 +107,16 @@ def _parse_glo_block(lines) -> GloEphemeris | None:
         lines[3]
     )
 
+    eph.x_pos *= 1e3  # km to m
+    eph.x_vel *= 1e3
+    eph.x_acc *= 1e3
+    eph.y_pos *= 1e3
+    eph.y_vel *= 1e3
+    eph.y_acc *= 1e3
+    eph.z_pos *= 1e3
+    eph.z_vel *= 1e3
+    eph.z_acc *= 1e3
+
     eph.freq_number = int(freq_number)
     eph.health = int(health)
     if eph.health != 0:
@@ -268,8 +278,10 @@ def parse_rinex_nav(file_path: str) -> EphemerisData:
                 # Unsupported constellation
                 pass
 
-    print(f"Loaded {len(eph_data.gps_ephemerides)} GPS ephemerides, "
-          f"{len(eph_data.glo_ephemerides)} GLONASS ephemerides, "
-          f"{len(eph_data.gal_ephemerides)} Galileo ephemerides, "
-          f"{len(eph_data.bds_ephemerides)} BeiDou ephemerides")
+    print(
+        f"Loaded {len(eph_data.gps_ephemerides)} GPS ephemerides, "
+        f"{len(eph_data.glo_ephemerides)} GLONASS ephemerides, "
+        f"{len(eph_data.gal_ephemerides)} Galileo ephemerides, "
+        f"{len(eph_data.bds_ephemerides)} BeiDou ephemerides"
+    )
     return eph_data

@@ -126,7 +126,7 @@ class GloConstants:
     A_E = 6378136.0
 
     # Second zonal coefficient of spherical harmonic expansion
-    C_20 = -108263e-9
+    C_20 = 108263e-9
 
     PrnToChannelNum = {
         1: 1,

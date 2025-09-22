@@ -208,9 +208,9 @@ def compute_glo_sat_info(
     )
     acc = np.array([eph.x_acc, eph.y_acc, eph.z_acc])
 
-    def _differentialEqn(y):
-        x, y_, z, vx, vy, vz = y
-        r = math.sqrt(x * x + y_ * y_ + z * z)
+    def _differentialEqn(state):
+        x, y, z, vx, vy, vz = state
+        r = math.sqrt(x * x + y * y + z * z)
         mu = gnssConst.GloConstants.MU
         a_e = gnssConst.GloConstants.A_E
         c20 = gnssConst.GloConstants.C_20
@@ -223,9 +223,9 @@ def compute_glo_sat_info(
             + acc[0]
         )
         ay = (
-            -mu * y_ / r**3
-            - 1.5 * c20 * mu * (a_e**2 / r**5) * y_ * (1 - 5 * z * z / r**2)
-            + omega**2 * y_
+            -mu * y / r**3
+            - 1.5 * c20 * mu * (a_e**2 / r**5) * y * (1 - 5 * z * z / r**2)
+            + omega**2 * y
             - 2 * omega * vx
             + acc[1]
         )

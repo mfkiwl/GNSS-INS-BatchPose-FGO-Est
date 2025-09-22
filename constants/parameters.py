@@ -1,7 +1,31 @@
 from dataclasses import dataclass, field
 import numpy as np
 import pymap3d as pm
-from gnss_utils.model_utils import compute_ecef_ned_rot_mat
+
+
+def compute_ecef_ned_rot_mat(lat_rad: float, lon_rad: float) -> np.ndarray:
+    """
+    Compute the rotation matrix from ECEF to NED frame.
+
+    Args:
+        lat_rad: Latitude in radians
+        lon_rad: Longitude in radians
+
+    Returns:
+        3x3 rotation matrix from ECEF to NED
+    """
+    sin_lat = np.sin(lat_rad)
+    cos_lat = np.cos(lat_rad)
+    sin_lon = np.sin(lon_rad)
+    cos_lon = np.cos(lon_rad)
+
+    return np.array(
+        [
+            [-sin_lat * cos_lon, -sin_lat * sin_lon, cos_lat],
+            [-sin_lon, cos_lon, 0],
+            [-cos_lat * cos_lon, -cos_lat * sin_lon, -sin_lat],
+        ]
+    )
 
 
 def computeGravityConst(lat_rad: float) -> float:
@@ -16,10 +40,14 @@ def computeGravityConst(lat_rad: float) -> float:
 
 @dataclass
 class GnssParameters:
-    ELEVATION_MASK: float = 15.0  # Minimum elevation angle in degrees
+    ELEVATION_MASK_DEG: float = 15.0  # Minimum elevation angle in degrees
     CNO_THRESHOLD: float = (
         20.0  # Minimum C/N0 in dB-Hz for a satellite to be considered valid
     )
+    PIVOT_SAT_ELEVATION_MASK_DEG: float = (
+        40.0  # Minimum elevation angle for pivot satellite
+    )
+    PIVOT_SAT_CNO_THRESHOLD: float = 35.0  # Minimum C/N0 in dB-Hz for pivot satellite
     CYCLE_SLIP_THRESHOLD_M: float = 0.1  # Geometry-free cycle slip threshold
 
     enable_gps: bool = True
@@ -29,7 +57,7 @@ class GnssParameters:
 
 
 RINEX_OBS_CHANNEL_TO_USE: dict[str, set[str]] = {
-    "G": {"1C", "2L"},
+    "G": {"1C", "2W"},
     "R": {"1C", "2C"},
     "E": {"1C", "7Q"},
     "C": {"2I"},
@@ -65,10 +93,6 @@ def BASE_ECEF_TO_NED_ROT_MAT():
     global _ecef_to_ned_rot
     if _ecef_to_ned_rot is None:
         lla = BASE_POS_LLA_RAD()
-        # Rotation from ECEF to NED at base position
-        # C_e_n = [   -sin_lat*cos_lng -sin_lat*sin_lng   cos_lat; % Farrell eqn. 2.32
-        #             -sin_lng          cos_lng           0;
-        #             -cos_lat*cos_lng -cos_lat*sin_lng  -sin_lat];
         _ecef_to_ned_rot = compute_ecef_ned_rot_mat(lla[0], lla[1])
     return _ecef_to_ned_rot
 
