@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from gnss_utils.time_utils import GpsTime
+from gnss_utils.model_utils import compute_world_frame_coord_from_ecef
 from typing import Dict
 import numpy as np
 import pandas as pd
@@ -22,6 +23,9 @@ class GroundTruthSingleEpoch:
     pos_ecef_m: np.ndarray = field(
         default_factory=lambda: np.zeros((3,))
     )  # Position (3 x 1) in ECEF coordinates (meters)
+    pos_world_ned_m: np.ndarray = field(
+        default_factory=lambda: np.zeros((3,))
+    )  # Position (3 x 1) in world-frame NED coordinates (meters)
     vel_ned_mps: np.ndarray = field(
         default_factory=lambda: np.zeros((3,))
     )  # Velocity (3 x 1) in NED coordinates (meters per second)
@@ -63,6 +67,7 @@ def parse_ground_truth_log(file_path: str) -> Dict[GpsTime, GroundTruthSingleEpo
             orthometric_h_m = float(parts[6])
             x, y, z = pm.geodetic2ecef(lat_deg, lon_deg, ellipsoid_h_m)
             pos_ecef_m = np.asarray([x, y, z])
+            pos_world_ned_m = compute_world_frame_coord_from_ecef(pos_ecef_m)
             vel_ned_mps = np.asarray(
                 [float(parts[17]), float(parts[18]), float(parts[19])]
             )
@@ -74,6 +79,7 @@ def parse_ground_truth_log(file_path: str) -> Dict[GpsTime, GroundTruthSingleEpo
                 ellipsoid_h_m=ellipsoid_h_m,
                 orthometric_h_m=orthometric_h_m,
                 pos_ecef_m=pos_ecef_m,
+                pos_world_ned_m=pos_world_ned_m,
                 vel_ned_mps=vel_ned_mps,
             )
 
