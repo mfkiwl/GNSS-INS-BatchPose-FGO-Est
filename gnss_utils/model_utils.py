@@ -2,6 +2,7 @@ import numpy as np
 from typing import Dict, Optional, Tuple
 
 from gnss_utils.gnss_data_utils import GnssMeasurementChannel, SignalChannelId
+from constants.parameters import BASE_POS_ECEF, BASE_ECEF_TO_NED_ROT_MAT
 from gnss_utils import satellite_utils
 
 
@@ -13,6 +14,17 @@ def compute_ecef_ned_rot_mat(lat_rad: float, lon_rad: float) -> np.ndarray:
     )
 
     return _compute_ecef_ned_rot_mat(lat_rad, lon_rad)
+
+
+def compute_world_frame_coord_from_ecef(ecef_pos_m: np.ndarray) -> np.ndarray:
+    """Convert ECEF coordinates to local NED frame coordinates.
+    World frame is defined as NED frame centered at the base station.
+    """
+
+    # Apply the rotation to the ECEF position
+    ned_pos_m = BASE_ECEF_TO_NED_ROT_MAT() @ (ecef_pos_m - BASE_POS_ECEF)
+
+    return ned_pos_m
 
 
 def cn0_based_noise_std(cn0: float, a: float, b: float) -> float:
