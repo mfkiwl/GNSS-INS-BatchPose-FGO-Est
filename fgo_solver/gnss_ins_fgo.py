@@ -13,6 +13,7 @@ import pymap3d as pm
 
 from constants.gnss_constants import CycleSlipType
 from constants.parameters import (
+    AmbiguityMode,
     BASE_ECEF_TO_ENU_ROT_MAT,
     BASE_POS_ECEF,
     GNSS_ELEV_MODEL_PARAMS,
@@ -445,6 +446,11 @@ class RtkInsFgo:
             pivot_ch.sigma_code_m = pivot_code_std
             pivot_ch.sigma_phase_m = pivot_phase_std
 
+            force_new_ambiguity = (
+                pivot_changed
+                or GnssParameters.ambiguity_mode == AmbiguityMode.INSTANTANEOUS
+            )
+
             for scid, ch in signal_channels.items():
                 if scid == pivot_id:
                     continue
@@ -453,7 +459,7 @@ class RtkInsFgo:
                     ch,
                     pivot_ch,
                     rel_time,
-                    pivot_changed,
+                    force_new_ambiguity,
                 )
                 if amb_key is None:
                     raise RuntimeError("Failed to resolve ambiguity key")

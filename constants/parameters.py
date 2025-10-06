@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from enum import Enum
 import numpy as np
 import pymap3d as pm
 from gnss_utils.gnss_dataclass import SignalType
@@ -65,6 +66,11 @@ def computeGravityConst(lat_rad: float) -> float:
     return g_h
 
 
+class AmbiguityMode(Enum):
+    CONTINUOUS = 1
+    INSTANTANEOUS = 2
+
+
 @dataclass
 class GnssParameters:
     ELEVATION_MASK_DEG: float = 15.0  # Minimum elevation angle in degrees
@@ -81,6 +87,8 @@ class GnssParameters:
     enable_galileo: bool = True
     enable_glonass: bool = True
     enable_beidou: bool = True
+
+    ambiguity_mode: AmbiguityMode = AmbiguityMode.INSTANTANEOUS
 
 
 phase_sigma_a = 0.003  # meters
