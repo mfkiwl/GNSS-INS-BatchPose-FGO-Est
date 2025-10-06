@@ -2,7 +2,7 @@ import numpy as np
 from typing import Dict, Optional, Tuple
 
 from gnss_utils.gnss_data_utils import GnssMeasurementChannel, SignalChannelId
-from constants.parameters import BASE_POS_ECEF, BASE_ECEF_TO_NED_ROT_MAT
+from constants.parameters import BASE_POS_ECEF, BASE_ECEF_TO_ENU_ROT_MAT
 from gnss_utils import satellite_utils
 
 
@@ -16,15 +16,24 @@ def compute_ecef_ned_rot_mat(lat_rad: float, lon_rad: float) -> np.ndarray:
     return _compute_ecef_ned_rot_mat(lat_rad, lon_rad)
 
 
+def compute_ecef_enu_rot_mat(lat_rad: float, lon_rad: float) -> np.ndarray:
+    """Import the function from constants.parameters to avoid circular import."""
+    from constants.parameters import (
+        compute_ecef_enu_rot_mat as _compute_ecef_enu_rot_mat,
+    )
+
+    return _compute_ecef_enu_rot_mat(lat_rad, lon_rad)
+
+
 def compute_world_frame_coord_from_ecef(ecef_pos_m: np.ndarray) -> np.ndarray:
-    """Convert ECEF coordinates to local NED frame coordinates.
-    World frame is defined as NED frame centered at the base station.
+    """Convert ECEF coordinates to local ENU frame coordinates.
+    World frame is defined as ENU frame centered at the base station.
     """
 
     # Apply the rotation to the ECEF position
-    ned_pos_m = BASE_ECEF_TO_NED_ROT_MAT() @ (ecef_pos_m - BASE_POS_ECEF)
+    enu_pos_m = BASE_ECEF_TO_ENU_ROT_MAT() @ (ecef_pos_m - BASE_POS_ECEF)
 
-    return ned_pos_m
+    return enu_pos_m
 
 
 def cn0_based_noise_std(cn0: float, a: float, b: float) -> float:
@@ -86,7 +95,7 @@ def elevation_based_noise_var(elev_deg: float, a: float, b: float) -> float:
 def select_pivot_satellite(
     channels: Dict[SignalChannelId, GnssMeasurementChannel],
     recv_pos_ecef: np.ndarray,
-    ecef_to_ned_rot: np.ndarray,
+    ecef_to_enu_rot: np.ndarray,
     *,
     min_elev_deg: Optional[float] = None,
     min_cn0_dbhz: Optional[float] = None,
@@ -132,7 +141,7 @@ def select_pivot_satellite(
             if ch.sat_pos_ecef_m is None:
                 continue
             elev_deg, az_deg = satellite_utils.compute_sat_elev_az(
-                ecef_to_ned_rot, recv_pos_ecef, ch.sat_pos_ecef_m
+                ecef_to_enu_rot, recv_pos_ecef, ch.sat_pos_ecef_m
             )
             ch.elevation_deg = elev_deg
             ch.azimuth_deg = az_deg

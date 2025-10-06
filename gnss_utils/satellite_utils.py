@@ -30,26 +30,24 @@ def sagnac_correction(recv_pos: np.ndarray, sat_pos: np.ndarray) -> float:
 
 
 def compute_sat_elev_az(
-    ecef_to_ned_rot: np.ndarray, recv_pos_ecef: np.ndarray, sat_pos_ecef: np.ndarray
+    ecef_to_local_rot: np.ndarray, recv_pos_ecef: np.ndarray, sat_pos_ecef: np.ndarray
 ) -> Tuple[float, float]:
     """
     Compute satellite elevation and azimuth angles.
     Args:
-        ecef_to_ned_rot: Rotation matrix from ECEF to NED frame at receiver position.
+        ecef_to_local_rot: Rotation matrix from ECEF to ENU frame at receiver position.
         recv_pos_ecef: Receiver position in ECEF coordinates (meters).
         sat_pos_ecef: Satellite position in ECEF coordinates (meters).
     Returns:
         elevation: Elevation angle in degrees.
         azimuth: Azimuth angle in degrees.
     """
-    # Compute satellite position in NED frame
-    sat_pos_ned = ecef_to_ned_rot @ (sat_pos_ecef - recv_pos_ecef)
+    # Compute satellite position in ENU frame
+    sat_pos_enu = ecef_to_local_rot @ (sat_pos_ecef - recv_pos_ecef)
 
-    # Compute elevation and azimuth angles
-    elevation_deg = math.degrees(
-        math.atan2(-sat_pos_ned[2], np.linalg.norm(sat_pos_ned[:2]))
-    )
-    azimuth_deg = math.degrees(math.atan2(sat_pos_ned[1], sat_pos_ned[0]))
+    horizontal_norm = math.hypot(sat_pos_enu[0], sat_pos_enu[1])
+    elevation_deg = math.degrees(math.atan2(sat_pos_enu[2], horizontal_norm))
+    azimuth_deg = math.degrees(math.atan2(sat_pos_enu[0], sat_pos_enu[1]))
     if azimuth_deg < 0:
         azimuth_deg += 360.0
 

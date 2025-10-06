@@ -30,6 +30,31 @@ def compute_ecef_ned_rot_mat(lat_rad: float, lon_rad: float) -> np.ndarray:
     )
 
 
+def compute_ecef_enu_rot_mat(lat_rad: float, lon_rad: float) -> np.ndarray:
+    """
+    Compute the rotation matrix from ECEF to ENU frame.
+
+    Args:
+        lat_rad: Latitude in radians
+        lon_rad: Longitude in radians
+
+    Returns:
+        3x3 rotation matrix from ECEF to ENU
+    """
+    sin_lat = np.sin(lat_rad)
+    cos_lat = np.cos(lat_rad)
+    sin_lon = np.sin(lon_rad)
+    cos_lon = np.cos(lon_rad)
+
+    return np.array(
+        [
+            [-sin_lon, cos_lon, 0],
+            [-sin_lat * cos_lon, -sin_lat * sin_lon, cos_lat],
+            [cos_lat * cos_lon, cos_lat * sin_lon, sin_lat],
+        ]
+    )
+
+
 def computeGravityConst(lat_rad: float) -> float:
     g_h = (
         9.7803267715
@@ -64,7 +89,10 @@ phase_sigma_b = 0.003  # meters
 # SignalType -> (fact_a, fact_b)
 GNSS_ELEV_MODEL_PARAMS: dict[SignalType, tuple[float, float]] = {
     SignalType(Constellation.GPS, 1, "C"): (300 * phase_sigma_a, 450 * phase_sigma_b),
-    SignalType(Constellation.GPS, 2, "W"): (300 * phase_sigma_a, 450 * phase_sigma_b),
+    SignalType(Constellation.GPS, 2, "W"): (
+        2 * 300 * phase_sigma_a,
+        2 * 450 * phase_sigma_b,
+    ),
     SignalType(Constellation.GLO, 1, "C"): (700 * phase_sigma_a, 800 * phase_sigma_b),
     SignalType(Constellation.GLO, 2, "C"): (700 * phase_sigma_a, 800 * phase_sigma_b),
     SignalType(Constellation.GAL, 1, "C"): (350 * phase_sigma_a, 500 * phase_sigma_b),
@@ -87,7 +115,7 @@ BASE_POS_ECEF = [
 
 # Lazy-loaded constants - computed only once when first accessed
 _base_pos_lla_rad = None
-_ecef_to_ned_rot = None
+_ecef_to_enu_rot = None
 
 
 def BASE_POS_LLA_RAD():
@@ -99,18 +127,26 @@ def BASE_POS_LLA_RAD():
     return _base_pos_lla_rad
 
 
-def BASE_ECEF_TO_NED_ROT_MAT():
+def BASE_ECEF_TO_ENU_ROT_MAT():
     """
-    Rotation matrix from ECEF to NED at base position.
-    C_e_n = [   -sin_lat*cos_lng -sin_lat*sin_lng   cos_lat; % Farrell eqn. 2.32
-                -sin_lng          cos_lng           0;
-                -cos_lat*cos_lng -cos_lat*sin_lng  -sin_lat];
+    Rotation matrix from ECEF to ENU at base position.
     """
-    global _ecef_to_ned_rot
-    if _ecef_to_ned_rot is None:
+    global _ecef_to_enu_rot
+    if _ecef_to_enu_rot is None:
         lla = BASE_POS_LLA_RAD()
-        _ecef_to_ned_rot = compute_ecef_ned_rot_mat(lla[0], lla[1])
-    return _ecef_to_ned_rot
+        _ecef_to_enu_rot = compute_ecef_enu_rot_mat(lla[0], lla[1])
+    return _ecef_to_enu_rot
+
+
+INIT_VEL_ENU = np.array([-0.527, -0.246, 0.0204])
+# The y-axis of IMU point to the heading of the vehicle.
+# Rotates from ENU (nav to body) = -90 + math.atan2(INIT_VEL_ENU[1], INIT_VEL_ENU[0]) ~= -90-155 degrees
+# Nav to body = 360 + ( -90 - 155) = 115 degrees
+# Body to Nav = - 115 degrees
+INIT_YAW_RAD = np.deg2rad(-115.0)
+INIT_ATTITUDE_STD_RAD = np.deg2rad(np.array([10.0, 10.0, 20.0]))
+INIT_ACC_BIAS_STD = np.full(3, 2.5e-3)
+INIT_GYRO_BIAS_STD = np.full(3, 4.0e-6)
 
 
 INCH_TO_METER = 0.0254  # 1 inch = 0.0254 meters
