@@ -12,20 +12,7 @@ import numpy as np
 import pymap3d as pm
 
 from constants.gnss_constants import CycleSlipType
-from constants.parameters import (
-    AmbiguityMode,
-    BASE_ECEF_TO_ENU_ROT_MAT,
-    BASE_POS_ECEF,
-    GNSS_ELEV_MODEL_PARAMS,
-    GnssParameters,
-    INIT_ACC_BIAS_STD,
-    INIT_ATTITUDE_STD_RAD,
-    INIT_GYRO_BIAS_STD,
-    INIT_VEL_ENU,
-    INIT_YAW_RAD,
-    phase_sigma_a,
-    phase_sigma_b,
-)
+from constants.parameters import *
 from fgo_solver import utils, meas_error_models
 from gnss_utils.gnss_data_utils import (
     GnssMeasurementChannel,
@@ -352,11 +339,19 @@ class RtkInsFgo:
         bias_key = BIAS_KEY(0)
 
         initial_pose = gtsam.Pose3(gtsam.Rot3.Ypr(INIT_YAW_RAD, 0.0, 0.0), initial_enu)
-        initial_velocity = np.asarray(INIT_VEL_ENU, dtype=float)
+        initial_velocity = np.asarray([0.0, 0.0, 0.0], dtype=float)
         initial_bias = gtsam.imuBias.ConstantBias(np.zeros(3), np.zeros(3))
 
         pose_prior_noise = gtsam.noiseModel.Diagonal.Sigmas(
-            np.concatenate((INIT_ATTITUDE_STD_RAD, np.full(3, 40.0)))
+            np.concatenate(
+                (
+                    INIT_ATTITUDE_STD_RAD,
+                    np.asarray(
+                        [INIT_POS_HOR_STD_M, INIT_POS_HOR_STD_M, INIT_POS_VER_STD_M],
+                        dtype=float,
+                    ),
+                )
+            )
         )
         velocity_prior_noise = gtsam.noiseModel.Isotropic.Sigma(3, 5.0)
         bias_prior_noise = gtsam.noiseModel.Diagonal.Sigmas(
@@ -424,7 +419,7 @@ class RtkInsFgo:
             grouped[scid.signal_type][scid] = ch
 
         for signal_type, signal_channels in grouped.items():
-            if len(signal_channels) < 3:
+            if len(signal_channels) < GnssParameters.MIN_NUM_SIGNALS_FOR_DD:
                 continue
             pivot_info = select_pivot_satellite(
                 signal_channels,

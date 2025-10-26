@@ -4,66 +4,7 @@ import numpy as np
 import pymap3d as pm
 from gnss_utils.gnss_dataclass import SignalType
 from constants.gnss_constants import Constellation
-
-
-def compute_ecef_ned_rot_mat(lat_rad: float, lon_rad: float) -> np.ndarray:
-    """
-    Compute the rotation matrix from ECEF to NED frame.
-
-    Args:
-        lat_rad: Latitude in radians
-        lon_rad: Longitude in radians
-
-    Returns:
-        3x3 rotation matrix from ECEF to NED
-    """
-    sin_lat = np.sin(lat_rad)
-    cos_lat = np.cos(lat_rad)
-    sin_lon = np.sin(lon_rad)
-    cos_lon = np.cos(lon_rad)
-
-    return np.array(
-        [
-            [-sin_lat * cos_lon, -sin_lat * sin_lon, cos_lat],
-            [-sin_lon, cos_lon, 0],
-            [-cos_lat * cos_lon, -cos_lat * sin_lon, -sin_lat],
-        ]
-    )
-
-
-def compute_ecef_enu_rot_mat(lat_rad: float, lon_rad: float) -> np.ndarray:
-    """
-    Compute the rotation matrix from ECEF to ENU frame.
-
-    Args:
-        lat_rad: Latitude in radians
-        lon_rad: Longitude in radians
-
-    Returns:
-        3x3 rotation matrix from ECEF to ENU
-    """
-    sin_lat = np.sin(lat_rad)
-    cos_lat = np.cos(lat_rad)
-    sin_lon = np.sin(lon_rad)
-    cos_lon = np.cos(lon_rad)
-
-    return np.array(
-        [
-            [-sin_lon, cos_lon, 0],
-            [-sin_lat * cos_lon, -sin_lat * sin_lon, cos_lat],
-            [cos_lat * cos_lon, cos_lat * sin_lon, sin_lat],
-        ]
-    )
-
-
-def computeGravityConst(lat_rad: float) -> float:
-    g_h = (
-        9.7803267715
-        * (1 + 0.001931851353 * (np.sin(lat_rad)) ** 2)
-        / np.sqrt(1 - 0.0066943800229 * (np.sin(lat_rad)) ** 2)
-    )
-
-    return g_h
+import constants.common_utils as comm_utils
 
 
 class AmbiguityMode(Enum):
@@ -82,6 +23,14 @@ class GnssParameters:
     )
     PIVOT_SAT_CNO_THRESHOLD: float = 30.0  # Minimum C/N0 in dB-Hz for pivot satellite
     CYCLE_SLIP_THRESHOLD_M: float = 0.1  # Geometry-free cycle slip threshold
+
+    MIN_NUM_SIGNALS_FOR_DD: int = (
+        3  # Minimum number of common signals for double-difference
+    )
+
+    MIN_NUM_DD_SATS_FOR_OPENSKY: int = (
+        13  # Minimum number of double-difference satellites for open-sky
+    )
 
     enable_gps: bool = True
     enable_galileo: bool = True
@@ -139,7 +88,7 @@ def BASE_ECEF_TO_ENU_ROT_MAT():
     global _ecef_to_enu_rot
     if _ecef_to_enu_rot is None:
         lla = BASE_POS_LLA_RAD()
-        _ecef_to_enu_rot = compute_ecef_enu_rot_mat(lla[0], lla[1])
+        _ecef_to_enu_rot = comm_utils.compute_ecef_enu_rot_mat(lla[0], lla[1])
     return _ecef_to_enu_rot
 
 
@@ -152,6 +101,9 @@ INIT_YAW_RAD = np.deg2rad(-115.0)
 INIT_ATTITUDE_STD_RAD = np.deg2rad(np.array([10.0, 10.0, 20.0]))
 INIT_ACC_BIAS_STD = np.full(3, 2.5e-3)
 INIT_GYRO_BIAS_STD = np.full(3, 4.0e-6)
+INIT_POS_HOR_STD_M = 40.0  # Initial horizontal position standard deviation in meters
+INIT_POS_VER_STD_M = 10.0  # Initial vertical position standard deviation in meters
+INIT_VEL_STD_MPS = 5.0  # Initial velocity standard deviation in m/s
 
 
 INCH_TO_METER = 0.0254  # 1 inch = 0.0254 meters
@@ -166,7 +118,7 @@ class TexCupBoschImuParams:
         )
     )
 
-    gravity: float = computeGravityConst(BASE_POS_LLA_RAD()[0])
+    gravity: float = comm_utils.computeGravityConst(BASE_POS_LLA_RAD()[0])
     z_up: bool = True  # IMU z-axis points upward (GTSAM assumes Z axis pointing up)
 
     acc_noise_std = np.full(
@@ -192,7 +144,7 @@ class TexCupLordImuParams:
         )
     )
 
-    gravity: float = computeGravityConst(BASE_POS_LLA_RAD()[0])
+    gravity: float = comm_utils.computeGravityConst(BASE_POS_LLA_RAD()[0])
     z_up: bool = False
 
     acc_noise_std = np.full(3, 0.1 * gravity / 1e3)  # 0.1 mg/sqrt(Hz) > m/s^2/sqrt(Hz)
