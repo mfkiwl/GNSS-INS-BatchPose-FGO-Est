@@ -103,7 +103,6 @@ class RtkInsFgo:
         imu_params: Any,
         imu_data_list: Sequence[ImuSingleEpoch],
         *,
-        window_size_s: float = 5.0,
         use_isam: bool = True,
         final_batch_opt: bool = False,
         isam_relinearize_skip: int = 10,
@@ -112,7 +111,6 @@ class RtkInsFgo:
         debug_times: Optional[Iterable[GpsTime]] = None,
     ) -> None:
         self.imu_params = imu_params
-        self.window_size_s = window_size_s
         self.use_isam = use_isam
         self.final_batch_opt = final_batch_opt
         self.isam_relinearize_skip = isam_relinearize_skip
@@ -693,10 +691,6 @@ class RtkInsFgo:
                     ch.cycle_slip_status is not None
                     and ch.cycle_slip_status == CycleSlipType.NOT_DETECTED
                 )
-                is_stale = (
-                    state is not None
-                    and rel_time - state.last_update_sec > self.window_size_s
-                )
                 used_last_epoch = (
                     state is not None
                     and state.last_epoch_idx == self.current_epoch_idx - 1
@@ -705,7 +699,6 @@ class RtkInsFgo:
                     state is None
                     or force_new_ambiguity
                     or not slip_not_detected
-                    or is_stale
                     or not used_last_epoch
                 )
 
@@ -949,7 +942,6 @@ class RtkInsFgo:
             row_indices = code_active_idx + [n + idx for idx in phase_active_idx]
             if not row_indices:
                 continue
-            residual = residual_full[row_indices]
 
             dim_code = len(code_active_idx)
             dim_phase = len(phase_active_idx)

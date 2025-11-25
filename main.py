@@ -45,7 +45,7 @@ def main():
 
     eph_data = parse_rinex_nav(nav_file)
     rover_obs = parse_rinex_obs(rover_file)
-    base_obs = parse_rinex_obs(base_file, interval=30)
+    base_obs = parse_rinex_obs(base_file, interval=1.0)
     imu_data_list = parse_imu_log(imu_file, imu_params.z_up)
 
     apply_ephemerides_to_obs(rover_obs, eph_data)
@@ -73,7 +73,6 @@ def main():
     solver = RtkInsFgo(
         imu_params,
         imu_data_list,
-        window_size_s=5.0,
         show_progress=True,
         logger=logger,
         # debug_times=debug_times,
