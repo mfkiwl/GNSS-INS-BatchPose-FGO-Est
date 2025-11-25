@@ -8,8 +8,8 @@ from gnss_utils import satellite_utils
 
 # Import the function from constants to avoid circular import
 def compute_ecef_ned_rot_mat(lat_rad: float, lon_rad: float) -> np.ndarray:
-    """Import the function from constants.parameters to avoid circular import."""
-    from constants.parameters import (
+    """Import the function from common_utils to avoid circular import."""
+    from constants.common_utils import (
         compute_ecef_ned_rot_mat as _compute_ecef_ned_rot_mat,
     )
 
@@ -17,8 +17,8 @@ def compute_ecef_ned_rot_mat(lat_rad: float, lon_rad: float) -> np.ndarray:
 
 
 def compute_ecef_enu_rot_mat(lat_rad: float, lon_rad: float) -> np.ndarray:
-    """Import the function from constants.parameters to avoid circular import."""
-    from constants.parameters import (
+    """Import the function from common_utils to avoid circular import."""
+    from constants.common_utils import (
         compute_ecef_enu_rot_mat as _compute_ecef_enu_rot_mat,
     )
 

@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 import pandas as pd
 import constants.gnss_constants as gnssConst
 from gnss_utils.gnss_data_utils import Constellation
@@ -51,7 +53,11 @@ class GpsTime:
         """Initialize from a constellation system timestamp."""
         if not isinstance(timestamp, pd.Timestamp):
             raise TypeError("timestamp must be a pandas Timestamp")
-        timestamp.tz_localize(None)
+        if timestamp.tzinfo is None:
+            timestamp = timestamp.tz_localize("UTC")
+        else:
+            timestamp = timestamp.tz_convert("UTC")
+        timestamp = timestamp.tz_localize(None)
 
         if constellation == Constellation.GPS:
             dt = timestamp - gnssConst.GpsConstants.START_TIME_IN_UTC
@@ -76,6 +82,17 @@ class GpsTime:
                 - gnssConst.GpsConstants.START_TIME_IN_UTC
             )
             return cls(dt.total_seconds())
+
+    @classmethod
+    def fromUtcDatetime(cls, dt: datetime):
+        """Initialise from a Python ``datetime`` expressed in UTC."""
+        if not isinstance(dt, datetime):
+            raise TypeError("dt must be a datetime.datetime instance")
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        else:
+            dt = dt.astimezone(timezone.utc)
+        return cls.fromDatetime(pd.Timestamp(dt))
 
     def toDatetimeInUtc(self):
         """Return a pandas Timestamp (UTC) for this GPS time."""

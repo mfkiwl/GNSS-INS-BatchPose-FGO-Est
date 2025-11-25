@@ -28,9 +28,14 @@ class GnssParameters:
         3  # Minimum number of common signals for double-difference
     )
 
-    MIN_NUM_DD_SATS_FOR_OPENSKY: int = (
-        13  # Minimum number of double-difference satellites for open-sky
+    MIN_NUM_DD_SATS_FOR_SOL: int = (
+        5  # Minimum number of double-difference satellites to enable a GNSS solution
     )
+
+    MIN_NUM_DD_SATS_FOR_OPENSKY: int = (
+        14  # Minimum number of double-difference satellites for open-sky
+    )
+    HUBER_K: float = 1.5  # Breakpoint for robust GNSS factors
 
     enable_gps: bool = True
     enable_galileo: bool = True
@@ -42,6 +47,15 @@ class GnssParameters:
 
 phase_sigma_a = 0.003  # meters
 phase_sigma_b = 0.003  # meters
+
+
+@dataclass
+class OutlierOptParam:
+    RESIDUAL_GATE_THRESHOLD: float = 1.5  # Neyman–Pearson gate multiplier
+    KEEP_PHASE_WHEN_CODE_OUT: bool = (
+        False  # Keep phase measurements when code is outlier
+    )
+
 
 # SignalType -> (fact_a, fact_b)
 GNSS_ELEV_MODEL_PARAMS: dict[SignalType, tuple[float, float]] = {

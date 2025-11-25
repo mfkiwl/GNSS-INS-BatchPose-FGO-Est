@@ -1,0 +1,1 @@
+2025-11-24 14:09:13,868 DEBUG gnss_ins_fgo: WLS initialization failed (dd_count=10): Insufficient satellites for double-difference WLS initialization

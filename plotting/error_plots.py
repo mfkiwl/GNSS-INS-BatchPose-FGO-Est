@@ -59,12 +59,16 @@ def plot_position_errors(
     )
 
     fig.add_trace(
-        go.Scatter(x=ts, y=east_errors_m, name="East Error", line=dict(color="#1f77b4")),
+        go.Scatter(
+            x=ts, y=east_errors_m, name="East Error", line=dict(color="#1f77b4")
+        ),
         row=1,
         col=1,
     )
     fig.add_trace(
-        go.Scatter(x=ts, y=north_errors_m, name="North Error", line=dict(color="#ff7f0e")),
+        go.Scatter(
+            x=ts, y=north_errors_m, name="North Error", line=dict(color="#ff7f0e")
+        ),
         row=1,
         col=2,
     )
@@ -138,7 +142,8 @@ def plot_enu_trajectory(
     gt_east_m: Sequence[float],
     gt_north_m: Sequence[float],
     timestamps=None,
-    *,
+    solver_open_mask: Sequence[bool] | None = None,
+    *,  # everything after this must be passed by keyword
     output_html: str | Path = "plotting/trajectory_comparison.html",
 ):
     """Plot estimated vs ground-truth trajectory in the ENU plane."""
@@ -146,39 +151,93 @@ def plot_enu_trajectory(
     if not est_east_m:
         raise ValueError("Trajectory sequences must not be empty")
 
-    if not (
-        len(est_east_m)
-        == len(est_north_m)
-        == len(gt_east_m)
-        == len(gt_north_m)
-    ):
+    length = len(est_east_m)
+    if not (length == len(est_north_m) == len(gt_east_m) == len(gt_north_m)):
         raise ValueError("Trajectory sequences must have the same length")
+    if solver_open_mask is not None and length != len(solver_open_mask):
+        raise ValueError("solver_open_mask must match trajectory length")
 
     output_path = Path(output_html)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     fig = go.Figure()
-    fig.add_trace(
-        go.Scatter(
-            x=est_east_m,
-            y=est_north_m,
-            mode="markers+lines",
-            name="Estimated",
-            marker=dict(color="#1f77b4", size=6),
-            line=dict(color="#1f77b4"),
-            text=timestamps,
-            hovertemplate="East: %{x:.3f} m<br>North: %{y:.3f} m<extra>%{text}</extra>",
+
+    hover_text = timestamps if timestamps is not None else None
+
+    if solver_open_mask is None:
+        fig.add_trace(
+            go.Scatter(
+                x=est_east_m,
+                y=est_north_m,
+                mode="markers+lines",
+                name="Estimated",
+                marker=dict(color="#1f77b4", size=6),
+                line=dict(color="#1f77b4"),
+                text=hover_text,
+                hovertemplate="East: %{x:.3f} m<br>North: %{y:.3f} m<extra>%{text}</extra>",
+            )
         )
-    )
+    else:
+        open_x = []
+        open_y = []
+        open_text = []
+        urban_x = []
+        urban_y = []
+        urban_text = []
+        for x, y, mask, txt in zip(
+            est_east_m, est_north_m, solver_open_mask, hover_text or [None] * length
+        ):
+            if mask:
+                open_x.append(x)
+                open_y.append(y)
+                open_text.append(txt)
+                urban_x.append(None)
+                urban_y.append(None)
+                urban_text.append(None)
+            else:
+                open_x.append(None)
+                open_y.append(None)
+                open_text.append(None)
+                urban_x.append(x)
+                urban_y.append(y)
+                urban_text.append(txt)
+
+        fig.add_trace(
+            go.Scatter(
+                x=open_x,
+                y=open_y,
+                mode="markers+lines",
+                name="Estimated (Open Sky)",
+                marker=dict(color="#1f77b4", size=6),
+                line=dict(color="#1f77b4"),
+                text=open_text,
+                connectgaps=False,
+                hovertemplate="East: %{x:.3f} m<br>North: %{y:.3f} m<extra>%{text}</extra>",
+            )
+        )
+        fig.add_trace(
+            go.Scatter(
+                x=urban_x,
+                y=urban_y,
+                mode="markers+lines",
+                name="Estimated (Urban)",
+                marker=dict(color="#9467bd", size=6),
+                line=dict(color="#9467bd"),
+                text=urban_text,
+                connectgaps=False,
+                hovertemplate="East: %{x:.3f} m<br>North: %{y:.3f} m<extra>%{text}</extra>",
+            )
+        )
+
     fig.add_trace(
         go.Scatter(
             x=gt_east_m,
             y=gt_north_m,
             mode="markers+lines",
             name="Ground Truth",
-            marker=dict(color="#d62728", size=6, symbol="diamond"),
-            line=dict(color="#d62728"),
-            text=timestamps,
+            marker=dict(color="#90ee90", size=6, symbol="diamond"),
+            line=dict(color="#90ee90"),
+            text=hover_text,
             hovertemplate="East: %{x:.3f} m<br>North: %{y:.3f} m<extra>%{text}</extra>",
         )
     )

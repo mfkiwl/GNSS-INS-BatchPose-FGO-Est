@@ -1,3 +1,6 @@
+import logging
+from datetime import datetime, timezone
+from pathlib import Path
 import constants.parameters as params
 from fgo_solver.gnss_ins_fgo import RtkInsFgo
 from gnss_utils.cycle_slip_detection import detect_cycle_slips
@@ -6,6 +9,19 @@ from gnss_utils.rinex_nav_parser import parse_rinex_nav
 from gnss_utils.rinex_obs_parser import parse_rinex_obs
 from imu_utils.imu_data_utils import parse_ground_truth_log, parse_imu_log
 from plotting import analyze_position_results
+from gnss_utils.time_utils import GpsTime
+
+LOG_PATH = Path("logs/solver_debug.log")
+LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    handlers=[
+        logging.FileHandler(LOG_PATH, mode="w"),
+        # logging.StreamHandler(),  # optional: keep console output
+    ],
+)
 
 
 def _filter_epochs_with_gt(rover_obs, ground_truth_data):
@@ -46,19 +62,26 @@ def main():
 
     start_idx = 200
     end_idx = min(900, len(epochs_sorted) - 1)
+    debug_times = {
+        GpsTime.fromUtcDatetime(datetime(2019, 5, 9, 18, 59, 25, tzinfo=timezone.utc))
+    }
+
     if start_idx >= len(epochs_sorted):
         start_idx = 0
 
+    logger = logging.getLogger("gnss_ins_fgo")
     solver = RtkInsFgo(
         imu_params,
         imu_data_list,
         window_size_s=5.0,
         show_progress=True,
+        logger=logger,
+        # debug_times=debug_times,
     )
 
     results = solver.run(
         rover_obs,
-        # start_idx=start_idx,
+        start_idx=start_idx,
         # end_idx=end_idx,
     )
     if not results:
