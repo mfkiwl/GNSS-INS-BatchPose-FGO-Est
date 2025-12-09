@@ -6,13 +6,6 @@ from constants.gnss_constants import Constellation
 from gnss_utils.gnss_data_utils import GnssMeasurementChannel
 
 
-def skew_symmetric(v: np.ndarray) -> np.ndarray:
-    """Convert 3D vector to skew-symmetric matrix."""
-    if v.shape != (3,):
-        raise ValueError("Input vector must be 3-dimensional.")
-    return np.array([[0, -v[2], v[1]], [v[2], 0, -v[0]], [-v[1], v[0], 0]])
-
-
 def extract_satellite_id(
     channel: GnssMeasurementChannel,
 ) -> Tuple[Constellation, int]:

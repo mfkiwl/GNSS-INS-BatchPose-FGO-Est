@@ -81,7 +81,7 @@ def main():
     results = solver.run(
         rover_obs,
         start_idx=start_idx,
-        # end_idx=end_idx,
+        end_idx=1000,
     )
     if not results:
         print("Solver produced no results.")

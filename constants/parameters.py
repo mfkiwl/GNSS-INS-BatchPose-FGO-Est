@@ -24,6 +24,7 @@ class GnssParameters:
     CNO_THRESHOLD: float = (
         20.0  # Minimum C/N0 in dB-Hz for a satellite to be considered valid
     )
+    DOPPLER_SIGMA_MPS: float = 0.5  # Standard deviation for Doppler measurements (m/s)
     PIVOT_SAT_ELEVATION_MASK_DEG: float = (
         45.0  # Minimum elevation angle for pivot satellite
     )
@@ -47,6 +48,8 @@ class GnssParameters:
     enable_galileo: bool = True
     enable_glonass: bool = True
     enable_beidou: bool = True
+
+    use_doppler: bool = True  # Use Doppler measurements in the factor graph
 
     ambiguity_mode: AmbiguityMode = AmbiguityMode.CONTINUOUS
     amb_propagation_mode: AmbPropagationMode = AmbPropagationMode.CONSTANT

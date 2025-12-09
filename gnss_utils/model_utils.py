@@ -2,8 +2,16 @@ import numpy as np
 from typing import Dict, Optional, Tuple
 
 from gnss_utils.gnss_data_utils import GnssMeasurementChannel, SignalChannelId
-from constants.parameters import BASE_POS_ECEF, BASE_ECEF_TO_ENU_ROT_MAT
+from constants.parameters import (
+    BASE_POS_ECEF,
+    BASE_ECEF_TO_ENU_ROT_MAT,
+    GNSS_ELEV_MODEL_PARAMS,
+    GnssParameters,
+    phase_sigma_a,
+    phase_sigma_b,
+)
 from gnss_utils import satellite_utils
+from constants.common_utils import skew_symmetric
 
 
 # Import the function from constants to avoid circular import
@@ -159,3 +167,26 @@ def select_pivot_satellite(
     # Select by CN0 (desc), then elevation (desc)
     candidates.sort(key=lambda t: (t[1].cn0_dbhz, t[2]), reverse=True)
     return candidates[0]
+
+
+def measurement_std(signal_type, elev_deg: float) -> tuple[float, float]:
+    params = GNSS_ELEV_MODEL_PARAMS.get(signal_type)
+    if params is None:
+        raise ValueError(f"No elevation model sigma parameters for {signal_type}")
+    code_var = elevation_based_noise_var(elev_deg, params[0], params[1])
+    phase_var = elevation_based_noise_var(elev_deg, phase_sigma_a, 2.0 * phase_sigma_b)
+    return float(np.sqrt(code_var)), float(np.sqrt(phase_var))
+
+
+def doppler_meas_variance(
+    los_ecef: np.ndarray,
+    rot_enu_from_body: np.ndarray,
+    rot_ecef_from_enu: np.ndarray,
+    lever_arm_b: np.ndarray,
+    gyro_noise_std: np.ndarray,
+) -> float:
+    chain = (
+        los_ecef @ rot_ecef_from_enu @ rot_enu_from_body @ skew_symmetric(lever_arm_b)
+    )
+    sigma_gyro = float(chain @ gyro_noise_std)
+    return sigma_gyro**2 + GnssParameters.DOPPLER_SIGMA_MPS**2

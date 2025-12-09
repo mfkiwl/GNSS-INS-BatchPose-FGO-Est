@@ -24,7 +24,8 @@ from gnss_utils.gnss_data_utils import (
 from gnss_utils.model_utils import (
     compute_ecef_enu_rot_mat,
     compute_world_frame_coord_from_ecef,
-    elevation_based_noise_var,
+    doppler_meas_variance,
+    measurement_std,
     select_pivot_satellite,
 )
 from gnss_utils.satellite_utils import compute_sat_elev_az
@@ -51,6 +52,15 @@ class BatchMeasFactor:
     meas: List[GnssMeasurementChannel]
     code_mask: List[bool]
     phase_mask: List[bool]
+
+
+@dataclass
+class DopplerBatchFactor:
+    """Container for double-differenced Doppler measurements sharing a common pivot."""
+
+    pivot: GnssMeasurementChannel
+    meas: List[GnssMeasurementChannel]
+    gyro_meas: np.ndarray
 
 
 @dataclass
@@ -346,11 +356,17 @@ class RtkInsFgo:
             if self.final_batch_opt and self._epoch_keys:
                 initial_guess = self._prepare_initial_guess(gtsam.Values())
                 self._assert_all_values_connected(self.graph, initial_guess)
+                self.logger.info("Performing final batch optimization...")
                 estimate = self._optimize_with_lm(initial_guess)
                 self._latest_estimate = estimate
 
                 self.result_log.clear()
-                for epoch, pose_key, vel_key, bias_key in self._epoch_keys:
+                extract_iter = self._epoch_keys
+                if progress_enabled and tqdm is not None:
+                    extract_iter = tqdm(
+                        extract_iter, desc="Final batch extraction", unit="epoch"
+                    )
+                for epoch, pose_key, vel_key, bias_key in extract_iter:
                     self._extract_epoch_result(
                         epoch, pose_key, vel_key, bias_key, estimate
                     )
@@ -359,7 +375,12 @@ class RtkInsFgo:
             ):
                 # Reconstruct log from the final ISAM estimate to return a full-trajectory snapshot.
                 self.result_log.clear()
-                for epoch, pose_key, vel_key, bias_key in self._epoch_keys:
+                extract_iter = self._epoch_keys
+                if progress_enabled and tqdm is not None:
+                    extract_iter = tqdm(
+                        extract_iter, desc="ISAM result extraction", unit="epoch"
+                    )
+                for epoch, pose_key, vel_key, bias_key in extract_iter:
                     self._extract_epoch_result(
                         epoch, pose_key, vel_key, bias_key, self._latest_estimate
                     )
@@ -441,6 +462,57 @@ class RtkInsFgo:
 
         return residual
 
+    @staticmethod
+    def error_doppler_batch(
+        measurement: DopplerBatchFactor,
+        this: gtsam.CustomFactor,
+        values: gtsam.Values,
+        jacobians: Optional[List[np.ndarray]],
+    ) -> np.ndarray:
+        """Non-linear error function for Doppler double-difference factors."""
+
+        if not measurement.meas:
+            return np.zeros(0)
+
+        pose_key = this.keys()[0]
+        vel_key = this.keys()[1]
+        bias_key = this.keys()[2]
+
+        pose = values.atPose3(pose_key)
+        vel = np.asarray(values.atVector(vel_key), dtype=float)
+        bias = values.atConstantBias(bias_key)
+
+        residual, J_pose, J_vel, J_bias = (
+            meas_error_models.doppler_batch_residual_and_jacobian(
+                measurement.pivot,
+                measurement.meas,
+                pose,
+                vel,
+                RtkInsFgo._lever_arm(),
+                bias,
+                measurement.gyro_meas,
+                compute_jacobian=jacobians is not None,
+            )
+        )
+
+        if jacobians is not None:
+            if jacobians[0].size == 0:
+                jacobians[0] = J_pose
+            else:
+                jacobians[0][:] = J_pose
+
+            if jacobians[1].size == 0:
+                jacobians[1] = J_vel
+            else:
+                jacobians[1][:] = J_vel
+
+            if jacobians[2].size == 0:
+                jacobians[2] = J_bias
+            else:
+                jacobians[2][:] = J_bias
+
+        return residual
+
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
@@ -509,6 +581,8 @@ class RtkInsFgo:
         self._add_gnss_factors(
             epoch,
             pose_key,
+            vel_key,
+            bias_key,
             channels,
             initial_pose,
             initial_velocity,
@@ -595,6 +669,8 @@ class RtkInsFgo:
         self,
         epoch: GpsTime,
         pose_key: int,
+        vel_key: int,
+        bias_key: int,
         channels: Dict[SignalChannelId, GnssMeasurementChannel],
         pose_guess: gtsam.Pose3,
         velocity_guess: Optional[np.ndarray],
@@ -622,6 +698,7 @@ class RtkInsFgo:
         grouped: Dict[SignalType, Dict[SignalChannelId, GnssMeasurementChannel]] = (
             defaultdict(dict)
         )
+        doppler_candidates: List[Tuple[SignalChannelId, GnssMeasurementChannel]] = []
         for scid, ch in channels.items():
             if scid.signal_type in SIGNAL_TO_EXCLUDED_FROM_SOL:
                 continue
@@ -634,6 +711,12 @@ class RtkInsFgo:
             if elev_deg < GnssParameters.ELEVATION_MASK_DEG:
                 continue
             grouped[scid.signal_type][scid] = ch
+            if (
+                ch.doppler_mps is not None
+                and ch.sat_vel_ecef_m is not None
+                and np.isfinite(ch.doppler_mps)
+            ):
+                doppler_candidates.append((scid, ch))
 
         def emit_debug(skipped: bool) -> None:
             if not debug_enabled:
@@ -676,7 +759,7 @@ class RtkInsFgo:
             pivot_id, pivot_ch, _ = pivot_info
             pivot_changed = self._update_pivot(signal_type, pivot_id, pivot_ch)
 
-            pivot_code_std, pivot_phase_std = self._measurement_std(
+            pivot_code_std, pivot_phase_std = measurement_std(
                 signal_type, pivot_ch.elevation_deg
             )
             pivot_ch.sigma_code_m = pivot_code_std
@@ -693,9 +776,7 @@ class RtkInsFgo:
                 if scid == pivot_id:
                     continue
 
-                code_std, phase_std = self._measurement_std(
-                    signal_type, ch.elevation_deg
-                )
+                code_std, phase_std = measurement_std(signal_type, ch.elevation_deg)
 
                 state = self.ambiguities.get(scid)
                 slip_not_detected = (
@@ -1014,7 +1095,104 @@ class RtkInsFgo:
             )
             graph.push_back(factor)
 
+        self._add_doppler_factor(
+            graph,
+            pose_key,
+            vel_key,
+            bias_key,
+            doppler_candidates,
+            pose_guess,
+        )
+
         emit_debug(skipped=False)
+
+    def _add_doppler_factor(
+        self,
+        graph: gtsam.NonlinearFactorGraph,
+        pose_key: int,
+        vel_key: int,
+        bias_key: int,
+        doppler_candidates: List[Tuple[SignalChannelId, GnssMeasurementChannel]],
+        pose_guess: gtsam.Pose3,
+    ) -> None:
+        if not GnssParameters.use_doppler or len(doppler_candidates) < 2:
+            return
+
+        pivot_entry = max(doppler_candidates, key=lambda item: item[1].elevation_deg)
+        pivot_id, pivot_ch = pivot_entry
+        meas_candidates = [ch for scid, ch in doppler_candidates if scid != pivot_id]
+        if not meas_candidates:
+            return
+
+        lever_arm_b = self._lever_arm()
+        ant_ecef, rot_enu_from_body_guess, rot_ecef_from_enu = (
+            meas_error_models._antenna_ecef_from_pose(pose_guess, lever_arm_b)
+        )
+
+        try:
+            pivot_los, _ = meas_error_models.compute_los_and_theta_with_sagnac(
+                ant_ecef, pivot_ch.sat_pos_ecef_m
+            )
+        except ValueError:
+            return
+
+        meas_with_var: List[Tuple[GnssMeasurementChannel, float]] = []
+        for ch in meas_candidates:
+            try:
+                los_vec, _ = meas_error_models.compute_los_and_theta_with_sagnac(
+                    ant_ecef, ch.sat_pos_ecef_m
+                )
+            except ValueError:
+                continue
+            meas_with_var.append(
+                (
+                    ch,
+                    doppler_meas_variance(
+                        los_vec,
+                        rot_enu_from_body_guess,
+                        rot_ecef_from_enu,
+                        lever_arm_b,
+                        np.asarray(self.imu_params.gyro_noise_std, dtype=float),
+                    ),
+                )
+            )
+
+        if not meas_with_var:
+            return
+
+        pivot_var = doppler_meas_variance(
+            pivot_los,
+            rot_enu_from_body_guess,
+            rot_ecef_from_enu,
+            lever_arm_b,
+            np.asarray(self.imu_params.gyro_noise_std, dtype=float),
+        )
+
+        valid_meas = [item[0] for item in meas_with_var]
+        var_list = [item[1] for item in meas_with_var]
+
+        n = len(valid_meas)
+        noise_cov = np.full((n, n), pivot_var, dtype=float)
+        np.fill_diagonal(noise_cov, pivot_var + np.asarray(var_list))
+
+        noise = gtsam.noiseModel.Gaussian.Covariance(noise_cov)
+        huber = gtsam.noiseModel.mEstimator.Huber.Create(GnssParameters.HUBER_K)
+        noise = gtsam.noiseModel.Robust.Create(huber, noise)
+
+        gyro_meas = (
+            None
+            if self._last_imu_sample is None
+            else np.asarray(self._last_imu_sample.gyro_rps, dtype=float)
+        )
+        meas_batch = DopplerBatchFactor(
+            pivot=pivot_ch, meas=valid_meas, gyro_meas=gyro_meas
+        )
+        factor = gtsam.CustomFactor(
+            noise,
+            gtsam.KeyVector([pose_key, vel_key, bias_key]),
+            partial(RtkInsFgo.error_doppler_batch, meas_batch),
+        )
+        graph.push_back(factor)
 
     def _build_epoch_update(
         self,
@@ -1058,6 +1236,8 @@ class RtkInsFgo:
         self._add_gnss_factors(
             epoch,
             pose_key,
+            vel_key,
+            bias_key,
             channels,
             pose_guess,
             velocity_guess,
@@ -1231,13 +1411,10 @@ class RtkInsFgo:
             ch.cycle_slip_status is not None
             and ch.cycle_slip_status == CycleSlipType.NOT_DETECTED
         )
-        is_stale = (
-            state is not None and rel_time - state.last_update_sec > self.window_size_s
-        )
 
         prev_key_for_between: Optional[int] = None
 
-        if state is None or force_new or not slip_not_detected or is_stale:
+        if state is None or force_new or not slip_not_detected:
             key = AMB_KEY(self.next_amb_idx)
             self.next_amb_idx += 1
             init_val = self._initialize_ambiguity(ch, pivot_ch)
@@ -1288,18 +1465,6 @@ class RtkInsFgo:
         self.ambiguities[scid].last_update_sec = rel_time
         self.ambiguities[scid].last_epoch_idx = self.current_epoch_idx
         return state.key, False, prior_val, None
-
-    def _measurement_std(
-        self, signal_type: SignalType, elev_deg: float
-    ) -> Tuple[float, float]:
-        params = GNSS_ELEV_MODEL_PARAMS.get(signal_type)
-        if params is None:
-            raise ValueError(f"No elevation model sigma parameters for {signal_type}")
-        code_var = elevation_based_noise_var(elev_deg, params[0], params[1])
-        phase_var = elevation_based_noise_var(
-            elev_deg, phase_sigma_a, 2.0 * phase_sigma_b
-        )
-        return float(np.sqrt(code_var)), float(np.sqrt(phase_var))
 
     def _initialize_ambiguity(
         self,
